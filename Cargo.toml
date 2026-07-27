@@ -1,0 +1,32 @@
+[package]
+name = "RAFAEL"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "rafael"
+path = "src/lib.rs"
+
+[[bin]]
+name = "maketree"
+path = "src/bin/maketree.rs"
+
+[[bin]]
+name = "rafael"
+path = "src/bin/rafael_main.rs"
+
+[dependencies]
+rand = "0.8.5"
+chrono = "0.4"
+filetime = "0.2"
+syslog = "7.0.0"
+rayon = "1.10.0"
+indicatif = "0.17.9"
+crossbeam = "0.8.4"
+rustix = { version = "1.0.8", features = ["fs"] }
+clap = { version = "4.5.20", features = ["derive"] }
+nix = { version = "0.31.2", features = ["fs", "dir"] }
+env_logger = "0.11.8"
+log = "0.4.22"
+
+
