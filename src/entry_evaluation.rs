@@ -12,6 +12,8 @@ use nix::errno::Errno;
 use nix::sys::stat::SFlag;
 use rustix::fd::BorrowedFd;
 use std::ffi::CStr;
+use std::io::BufWriter;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -26,6 +28,7 @@ pub fn evaluate_entry(
     stats: &PurgeStatistics,
     worker_queues: &Vec<SegQueue<WorkItem>>,
     worker_log_file: &SharedLog,
+    worker_puriel_target_file: &mut Option<BufWriter<fs::File>>,
     new_parent: &Option<Arc<PurgeCandidate>>,
 ) {
     let entry = match entry_result {
@@ -90,6 +93,7 @@ pub fn evaluate_entry(
                         stats,
                         &entry_metadata,
                         worker_log_file,
+                        worker_puriel_target_file,
                     ) {
                         true => {
                             debug!("PURGABLE ENTRY: {}", entry_path.display());

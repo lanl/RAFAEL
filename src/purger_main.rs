@@ -45,6 +45,16 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
     ));
     let _ = fs::create_dir(&args.rp_log_dir);
 
+    //If puriel is enabled then create the puriel target directory with current date and time
+    if args.enable_puriel{
+        args.pr_target_dir = PathBuf::from(format!(
+            "{}_{}",
+            args.pr_target_dir.display(),
+            Local::now().format("%m-%d-%Y_%H:%M:%S").to_string()
+        ));
+        let _ = fs::create_dir(&args.pr_target_dir);
+    }
+
     //Check if an exception/purning file was passed
     let mut exceptions: Vec<String> = Vec::new();
 

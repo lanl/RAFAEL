@@ -96,6 +96,23 @@ pub struct Cli {
     /// Delete all contents of specified root directory
     #[arg(long)]
     pub erase: bool,
+
+    #[arg(
+        long,
+        long_help = "Enable Puriel premptive purge calculations, This is argument is to be used in conjuntion with the program Puriel\n
+Puriel is a program that, at an admin determined time after Rafael has run, will run in order to purge files that were calculated\n"
+    )]
+    pub enable_puriel: bool,
+
+    /// Number of days ahead to evaluate whether currently non-purgeable items will become purgeable based on age constraints.
+    #[arg(long)]
+    #[arg(default_value_t = -1)]
+    pub puriel_days: i64,
+
+    /// With Puriel enabled a directory must be specified to output potential targets that each thread has found.
+    #[arg(long)]
+    #[arg(default_value = "pr_targets")]
+    pub pr_target_dir: PathBuf,
 }
 
 pub type SharedLog = Arc<Mutex<BufWriter<fs::File>>>;
@@ -181,6 +198,8 @@ pub fn thread_main(
     term: &SafraTerminator,
     start: &Instant,
 ) {
+
+
     thread::scope(|s| {
         for i in 0..args.thread_count {
             /////////////////
@@ -233,6 +252,29 @@ fn worker_main(
             eprintln!("Thread {} failed to create log file: {}", thread_index, e);
             return;
         }
+    };
+
+    //Create Thread x's puriel file if puriel is enabled
+    let mut puriel_target_file: Option<BufWriter<fs::File>> = match args.enable_puriel {
+        true => {
+            match fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(
+                    &args
+                        .pr_target_dir
+                        .join(format!("worker-{}-puriel.target", thread_index))
+                )
+            {
+                Ok(f) => Some(BufWriter::new(f)),
+                Err(e) => {
+                    eprintln!("Failed to create puriel log file: {}", e);
+                    return;
+                }
+            }
+        }
+        false => None,
     };
 
     //Check or verbose level, 1 we should print our traversal to stdout, 2 we should be writing our path to a file
@@ -295,6 +337,7 @@ fn worker_main(
             dirs_purged_stats,
             work_queues,
             &worker_dlog_file,
+            &mut puriel_target_file,
             exceptions,
         ) {
             Ok(()) => {
@@ -326,6 +369,7 @@ fn thread_directory_scan(
     dirs_purged_stats: &Arc<(AtomicUsize, AtomicUsize)>,
     worker_queues: &Vec<SegQueue<WorkItem>>,
     worker_log_file: &SharedLog,
+    worker_puriel_target_file: &mut Option<BufWriter<fs::File>>,
     exceptions: &Vec<String>,
 ) -> Result<(), String> {
     //Open dir at a low level to get file descriptor along with NO_ATIME
@@ -364,12 +408,17 @@ fn thread_directory_scan(
     };
 
     //Check if dir is purgable
-    let mut is_directory_purgable = is_entry_purgable(
-        args,
-        &dir_metadata,
-        current_local_dir.path.components().count(),
-        true,
-    );
+    let mut is_directory_purgable = match
+        is_entry_purgable(
+            args,
+            &dir_metadata,
+            current_local_dir.path.components().count(),
+            true,
+        ) {
+            EntryPurgeState::PurgeNow => { true },
+            EntryPurgeState::PurgeLater => { unreachable!("Should Never return purge later for dir") },
+            EntryPurgeState::NotPurgable => { false },
+        };
 
     //First check if the dir is purgable and that it is NOT one of the root dirs children
     let new_parent = if is_directory_purgable {
@@ -417,6 +466,7 @@ fn thread_directory_scan(
                     &stats,
                     worker_queues,
                     worker_log_file,
+                    worker_puriel_target_file,
                     &new_parent,
                 );
                 count += 1;
@@ -435,6 +485,7 @@ fn thread_directory_scan(
                     &stats,
                     worker_queues,
                     worker_log_file,
+                    worker_puriel_target_file,
                     &new_parent,
                 );
                 count += 1;
