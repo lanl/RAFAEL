@@ -138,7 +138,7 @@ pub fn is_entry_purgable(
 
     //Check if any timestamps are older than age specific in command line arguments.
     //If puriel is enabled check if the entry will be purgable in X amount of days in the future.
-    if args.enable_puriel {
+    if args.enable_puriel && !is_dir{
         //If puriel is enabled then initialize a current epoch time variable as it will also be used for puriel calculations.
         let current_epoch_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
