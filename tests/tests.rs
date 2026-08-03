@@ -84,11 +84,6 @@ mod tests {
         format!("testing_artifacts/{test_name}/fake_data_test")
     }
 
-    /*
-    fn test_input_absolute(test_name: &str) -> PathBuf {
-        format!("testing_artifacts/{test_name}/fake_data_test").into()
-    }*/
-
     fn test_input_absolute(test_name: &str) -> PathBuf {
         let x = format!("testing_artifacts/{}/fake_data_test", test_name);
         canonicalize(x).expect("Failed to resolve absolute path")
@@ -121,6 +116,9 @@ mod tests {
             thread_stats: false,
             erase: false,
             read_entire_dir: false,
+            enable_puriel: false,
+            puriel_days: -1,
+            pr_target_dir: "pr_targets".into(),
         };
         let results = purge_fs(&mut args);
 
@@ -173,6 +171,10 @@ mod tests {
             thread_stats: false,
             erase: false,
             read_entire_dir: false,
+            enable_puriel: false,
+            puriel_days: -1,
+            pr_target_dir: "pr_targets".into(),
+
         };
 
         let results = purge_fs(&mut args);
@@ -251,6 +253,10 @@ mod tests {
             thread_stats: false,
             erase: true,
             read_entire_dir: false,
+            enable_puriel: false,
+            puriel_days: -1,
+            pr_target_dir: "pr_targets".into(),
+
         };
 
         let results = purge_fs(&mut args);
@@ -330,6 +336,10 @@ mod tests {
             thread_stats: false,
             erase: false,
             read_entire_dir: false,
+            enable_puriel: false,
+            puriel_days: -1,
+            pr_target_dir: "pr_targets".into(),
+
         };
 
         let results = purge_fs(&mut args);
@@ -388,6 +398,10 @@ mod tests {
             thread_stats: false,
             erase: false,
             read_entire_dir: false,
+            enable_puriel: false,
+            puriel_days: -1,
+            pr_target_dir: "pr_targets".into(),
+
         };
 
         let results = purge_fs(&mut args);
