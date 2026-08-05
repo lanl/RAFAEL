@@ -98,6 +98,14 @@ pub fn process_file_statx(
         //We will still return false for the function so as to update any parent dirs to no longer be purgable.
         EntryPurgeState::PurgeLater => {
             write_to_puriel_target_file(worker_puriel_target_file, &file_path);
+            match &stats.puriel_items {
+                Some(items) => {
+                    items.fetch_add(1,Ordering::Relaxed);
+                },
+                None => {
+                    unreachable!("Puriel stats not initialized");
+                }
+            }
             return false;
         }
         //File was not purged and the directory was found to be purgable at the start

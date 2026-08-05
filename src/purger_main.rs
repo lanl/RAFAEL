@@ -30,6 +30,14 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
         files_purged: AtomicUsize::new(0),
         directories_checked: AtomicUsize::new(0),
         directories_purged: AtomicUsize::new(0),
+        puriel_items: match args.enable_puriel {
+            true => {
+                Some(AtomicUsize::new(0))
+            },
+            false => {
+                None
+            }
+        }
     };
 
     // Create a Vector of worker queues to be shared among threads

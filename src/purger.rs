@@ -122,6 +122,7 @@ pub struct PurgeStatistics {
     pub files_purged: AtomicUsize,
     pub directories_checked: AtomicUsize,
     pub directories_purged: AtomicUsize,
+    pub puriel_items: Option<AtomicUsize>,
 }
 
 pub struct WorkItem {
