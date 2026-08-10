@@ -5,7 +5,7 @@ use crate::purger::{write_to_log_file, Cli, PurgeStatistics, SharedLog};
 use crate::puriel_utils::write_to_puriel_target_file;
 
 use rustix::fd::BorrowedFd;
-use rustix::fs::{statx, AtFlags, Statx, StatxFlags};
+use rustix::fs::{CWD, statx, AtFlags, Statx, StatxFlags};
 use std::fs;
 use std::io::BufWriter;
 use std::path::PathBuf;
@@ -25,6 +25,24 @@ pub fn do_statx(dir_fd: BorrowedFd<'_>, file_path: &PathBuf) -> Result<Statx, St
     //Get the specified fields of file metadata
     let Ok(entry_metadata) = statx(
         dir_fd,
+        file_path,
+        AtFlags::SYMLINK_NOFOLLOW,
+        StatxFlags::ATIME
+            | StatxFlags::CTIME
+            | StatxFlags::MTIME
+            | StatxFlags::UID
+            | StatxFlags::MODE,
+    ) else {
+        return Err("Entry statx operation failed".to_string());
+    };
+    Ok(entry_metadata)
+}
+
+//Run a statx use CWD as the dir fd arguments, used exclusively for puriel
+pub fn do_statx_cwd(file_path: &PathBuf) -> Result<Statx, String> {
+    //Get the specified fields of file metadata
+    let Ok(entry_metadata) = statx(
+        CWD,
         file_path,
         AtFlags::SYMLINK_NOFOLLOW,
         StatxFlags::ATIME
@@ -114,6 +132,25 @@ pub fn process_file_statx(
             return false;
         }
     }
+}
+
+pub fn process_puriel_statx(
+    metadata: &Statx
+) -> EntryPurgeState{
+    if three_way_max(
+            metadata.stx_atime.tv_sec,
+            metadata.stx_ctime.tv_sec,
+            metadata.stx_mtime.tv_sec,
+    ) <  (SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Epoch calculation error")
+            .as_secs() as i64)
+    {
+        EntryPurgeState::PurgeNow
+    } else {
+        EntryPurgeState::NotPurgable
+    }
+
 }
 
 pub fn is_entry_purgable(
