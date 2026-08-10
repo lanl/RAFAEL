@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use rafael::puriel_utils::{Cli, puriel_main, PurielStatistics};
+use rafael::puriel_utils::{Cli, PurielStatistics, puriel_main};
 
-use clap::Parser;
-use std::sync::atomic::AtomicUsize;
-use std::path::PathBuf;
 use chrono::Local;
+use clap::Parser;
 use std::fs;
+use std::path::PathBuf;
+use std::sync::atomic::AtomicUsize;
 //use rafael::syslog_utility::send_syslog_message;
 
-fn main(){
+fn main() {
     //Benchmarking variable
     let start = std::time::Instant::now();
 
@@ -30,10 +30,5 @@ fn main(){
         targets_purged: AtomicUsize::new(0),
     };
 
-    puriel_main(
-        &args,
-        &puriel_stats,
-        start,
-    );
-
+    puriel_main(&args, &puriel_stats, start);
 }

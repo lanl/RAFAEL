@@ -2,7 +2,7 @@
 // Copyright 2026. Triad National Security, LLC.
 
 use clap::Parser;
-use filetime::{set_file_times, FileTime};
+use filetime::{FileTime, set_file_times};
 use rayon::prelude::*;
 use std::{
     fs,

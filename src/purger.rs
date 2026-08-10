@@ -13,19 +13,19 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use log::debug;
 use nix::dir::{Dir, Entry};
 use nix::errno::Errno;
-use nix::fcntl::{OFlag, AT_FDCWD};
+use nix::fcntl::{AT_FDCWD, OFlag};
 use nix::sys::stat::Mode;
 use nix::sys::stat::SFlag;
 use nix::sys::statfs::statfs;
 use rustix::fd::BorrowedFd;
-use rustix::fs::{statx, AtFlags, StatxFlags};
+use rustix::fs::{AtFlags, StatxFlags, statx};
 use std::fs;
 use std::io::{BufWriter, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
+    atomic::{AtomicUsize, Ordering},
 };
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -199,8 +199,6 @@ pub fn thread_main(
     term: &SafraTerminator,
     start: &Instant,
 ) {
-
-
     thread::scope(|s| {
         for i in 0..args.thread_count {
             /////////////////
@@ -265,9 +263,8 @@ fn worker_main(
                 .open(
                     &args
                         .pr_target_dir
-                        .join(format!("worker-{}-puriel.target", thread_index))
-                )
-            {
+                        .join(format!("worker-{}-puriel.target", thread_index)),
+                ) {
                 Ok(f) => Some(BufWriter::new(f)),
                 Err(e) => {
                     eprintln!("Failed to create puriel log file: {}", e);
@@ -409,17 +406,18 @@ fn thread_directory_scan(
     };
 
     //Check if dir is purgable
-    let mut is_directory_purgable = match
-        is_entry_purgable(
-            args,
-            &dir_metadata,
-            current_local_dir.path.components().count(),
-            true,
-        ) {
-            EntryPurgeState::PurgeNow => { true },
-            EntryPurgeState::PurgeLater => { unreachable!("Should Never return purge later for dir") },
-            EntryPurgeState::NotPurgable => { false },
-        };
+    let mut is_directory_purgable = match is_entry_purgable(
+        args,
+        &dir_metadata,
+        current_local_dir.path.components().count(),
+        true,
+    ) {
+        EntryPurgeState::PurgeNow => true,
+        EntryPurgeState::PurgeLater => {
+            unreachable!("Should Never return purge later for dir")
+        }
+        EntryPurgeState::NotPurgable => false,
+    };
 
     //First check if the dir is purgable and that it is NOT one of the root dirs children
     let new_parent = if is_directory_purgable {
@@ -591,16 +589,19 @@ pub fn display_purge_results(args: &Cli, purge_results: PurgeResults, now: std::
             .load(Ordering::Relaxed)
     );
 
-    if args.enable_puriel{
+    if args.enable_puriel {
         println!(
             "\n* PURIEL FILES:\n* Puriel Items logged: {}",
             match purge_results.purge_statistics.puriel_items {
-                Some(ref items) => {items.load(Ordering::Relaxed)}
-                None => {unreachable!("Error: Trying to output puriel stats when not enabled");}
+                Some(ref items) => {
+                    items.load(Ordering::Relaxed)
+                }
+                None => {
+                    unreachable!("Error: Trying to output puriel stats when not enabled");
+                }
             }
         )
     }
-
 
     println!("\n* DIRECTORIES: ");
     println!(

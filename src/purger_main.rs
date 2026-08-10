@@ -2,7 +2,7 @@
 // Copyright 2026. Triad National Security, LLC.
 
 use crate::purger::{
-    get_used_inodes, root_dir_walk, thread_main, Cli, PurgeResults, PurgeStatistics, WorkItem,
+    Cli, PurgeResults, PurgeStatistics, WorkItem, get_used_inodes, root_dir_walk, thread_main,
 };
 use crate::safra::SafraTerminator;
 
@@ -12,8 +12,8 @@ use crossbeam::queue::SegQueue;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 
 pub fn purge_fs(args: &mut Cli) -> PurgeResults {
     //Benchmarking variable
@@ -31,13 +31,9 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
         directories_checked: AtomicUsize::new(0),
         directories_purged: AtomicUsize::new(0),
         puriel_items: match args.enable_puriel {
-            true => {
-                Some(AtomicUsize::new(0))
-            },
-            false => {
-                None
-            }
-        }
+            true => Some(AtomicUsize::new(0)),
+            false => None,
+        },
     };
 
     // Create a Vector of worker queues to be shared among threads
@@ -54,7 +50,7 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
     let _ = fs::create_dir(&args.rp_log_dir);
 
     //If puriel is enabled then create the puriel target directory with current date and time
-    if args.enable_puriel{
+    if args.enable_puriel {
         args.pr_target_dir = PathBuf::from(format!(
             "{}_{}",
             args.pr_target_dir.display(),

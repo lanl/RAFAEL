@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::purger::{write_to_log_file, SharedLog};
+use crate::purger::{SharedLog, write_to_log_file};
 
 use rustix::fs::Statx;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 //Custom MetaData Struct to reduce memory consumption

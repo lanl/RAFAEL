@@ -3,11 +3,11 @@
 
 #[cfg(test)]
 mod tests {
-    use rafael::maketree::{make_tree, Cli};
+    use rafael::maketree::{Cli, make_tree};
     use rafael::purger::Cli as PurgeCli;
     use rafael::purger_main::purge_fs;
 
-    use std::fs::{canonicalize, File};
+    use std::fs::{File, canonicalize};
     use std::io::Write;
     use std::path::PathBuf;
     use std::process::{Command, Stdio};
@@ -178,7 +178,6 @@ mod tests {
             enable_puriel: false,
             puriel_days: -1,
             pr_target_dir: "pr_targets".into(),
-
         };
 
         let results = purge_fs(&mut args);
@@ -260,7 +259,6 @@ mod tests {
             enable_puriel: false,
             puriel_days: -1,
             pr_target_dir: "pr_targets".into(),
-
         };
 
         let results = purge_fs(&mut args);
@@ -343,7 +341,6 @@ mod tests {
             enable_puriel: false,
             puriel_days: -1,
             pr_target_dir: "pr_targets".into(),
-
         };
 
         let results = purge_fs(&mut args);
@@ -405,7 +402,6 @@ mod tests {
             enable_puriel: false,
             puriel_days: -1,
             pr_target_dir: "pr_targets".into(),
-
         };
 
         let results = purge_fs(&mut args);
@@ -481,7 +477,6 @@ mod tests {
             // By having puriel days set to 7, it is saying "What will be older than 5 days in 7 days", which should be all the files left over.
             puriel_days: 7,
             pr_target_dir: test_puriel_output("test_06"),
-
         };
 
         let results = purge_fs(&mut args);
@@ -506,18 +501,17 @@ mod tests {
         assert_eq!(
             results
                 .purge_statistics
-                .puriel_items.unwrap()
+                .puriel_items
+                .unwrap()
                 .load(Ordering::Relaxed),
             (results
                 .purge_statistics
                 .files_checked
                 .load(Ordering::Relaxed)
-            -
-            results
-                .purge_statistics
-                .files_purged
-                .load(Ordering::Relaxed)
-            )
+                - results
+                    .purge_statistics
+                    .files_purged
+                    .load(Ordering::Relaxed))
         );
         assert_eq!(
             results

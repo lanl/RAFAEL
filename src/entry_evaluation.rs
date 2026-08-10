@@ -3,7 +3,7 @@
 
 use crate::metadata_utils::*;
 use crate::purge_tree_utils::PurgeCandidate;
-use crate::purger::{is_dir_an_exception, Cli, PurgeStatistics, SharedLog, WorkItem};
+use crate::purger::{Cli, PurgeStatistics, SharedLog, WorkItem, is_dir_an_exception};
 
 use crossbeam::queue::SegQueue;
 use log::debug;
@@ -12,8 +12,8 @@ use nix::errno::Errno;
 use nix::sys::stat::SFlag;
 use rustix::fd::BorrowedFd;
 use std::ffi::CStr;
-use std::io::BufWriter;
 use std::fs;
+use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -115,7 +115,11 @@ pub fn evaluate_entry(
                 //Block Device, Character, or FIFO
                 SFlag::S_IFBLK | SFlag::S_IFCHR | SFlag::S_IFIFO => {
                     //Since we do not delete block, character, or FIFO devices we have to update the directory to not be purgable.
-                    debug!("DIR {}, NO LONGER PURGABLE DUE TO {} being a block, character, or FIFO file.", current_local_dir_path.display(), entry_path.display());
+                    debug!(
+                        "DIR {}, NO LONGER PURGABLE DUE TO {} being a block, character, or FIFO file.",
+                        current_local_dir_path.display(),
+                        entry_path.display()
+                    );
                     *is_directory_purgable = false;
                 }
                 //Unkown File type

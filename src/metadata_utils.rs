@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::purger::{write_to_log_file, Cli, PurgeStatistics, SharedLog};
+use crate::purger::{Cli, PurgeStatistics, SharedLog, write_to_log_file};
 use crate::puriel_utils::write_to_puriel_target_file;
 
 use rustix::fd::BorrowedFd;
-use rustix::fs::{CWD, statx, AtFlags, Statx, StatxFlags};
+use rustix::fs::{AtFlags, CWD, Statx, StatxFlags, statx};
 use std::fs;
 use std::io::BufWriter;
 use std::path::PathBuf;
@@ -118,8 +118,8 @@ pub fn process_file_statx(
             write_to_puriel_target_file(worker_puriel_target_file, &file_path);
             match &stats.puriel_items {
                 Some(items) => {
-                    items.fetch_add(1,Ordering::Relaxed);
-                },
+                    items.fetch_add(1, Ordering::Relaxed);
+                }
                 None => {
                     unreachable!("Puriel stats not initialized");
                 }
@@ -134,23 +134,20 @@ pub fn process_file_statx(
     }
 }
 
-pub fn process_puriel_statx(
-    metadata: &Statx
-) -> EntryPurgeState{
+pub fn process_puriel_statx(metadata: &Statx) -> EntryPurgeState {
     if three_way_max(
-            metadata.stx_atime.tv_sec,
-            metadata.stx_ctime.tv_sec,
-            metadata.stx_mtime.tv_sec,
-    ) <  (SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Epoch calculation error")
-            .as_secs() as i64)
+        metadata.stx_atime.tv_sec,
+        metadata.stx_ctime.tv_sec,
+        metadata.stx_mtime.tv_sec,
+    ) < (SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Epoch calculation error")
+        .as_secs() as i64)
     {
         EntryPurgeState::PurgeNow
     } else {
         EntryPurgeState::NotPurgable
     }
-
 }
 
 pub fn is_entry_purgable(
@@ -183,7 +180,7 @@ pub fn is_entry_purgable(
 
     //Check if any timestamps are older than age specific in command line arguments.
     //If puriel is enabled check if the entry will be purgable in X amount of days in the future.
-    if args.enable_puriel && !is_dir{
+    if args.enable_puriel && !is_dir {
         //If puriel is enabled then initialize a current epoch time variable as it will also be used for puriel calculations.
         let current_epoch_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -223,4 +220,3 @@ pub fn is_entry_purgable(
 fn three_way_max(t1: i64, t2: i64, t3: i64) -> i64 {
     std::cmp::max(t1, std::cmp::max(t2, t3))
 }
-

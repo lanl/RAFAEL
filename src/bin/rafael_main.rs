@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use rafael::purger::{display_purge_results, Cli};
+use rafael::purger::{Cli, display_purge_results};
 use rafael::purger_main::purge_fs;
 use rafael::syslog_utility::send_syslog_message;
 
