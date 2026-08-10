@@ -590,6 +590,18 @@ pub fn display_purge_results(args: &Cli, purge_results: PurgeResults, now: std::
             .files_purged
             .load(Ordering::Relaxed)
     );
+
+    if args.enable_puriel{
+        println!(
+            "\n* PURIEL FILES:\n* Puriel Items logged: {}",
+            match purge_results.purge_statistics.puriel_items {
+                Some(ref items) => {items.load(Ordering::Relaxed)}
+                None => {unreachable!("Error: Trying to output puriel stats when not enabled");}
+            }
+        )
+    }
+
+
     println!("\n* DIRECTORIES: ");
     println!(
         "* Directories checked: {}",
