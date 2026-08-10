@@ -93,6 +93,10 @@ mod tests {
         format!("testing_artifacts/{test_name}/PURGER_TEST_RESULTS").into()
     }
 
+    fn test_puriel_output(test_name: &str) -> PathBuf {
+        format!("testing_artifacts/{test_name}/PURIEL_TEST_RESULTS").into()
+    }
+
     fn test_exception(test_name: &str) -> PathBuf {
         format!("testing_artifacts/{test_name}/exceptions.txt").into()
     }
@@ -476,7 +480,7 @@ mod tests {
             enable_puriel: true,
             // By having puriel days set to 7, it is saying "What will be older than 5 days in 7 days", which should be all the files left over.
             puriel_days: 7,
-            pr_target_dir: "pr_targets".into(),
+            pr_target_dir: test_puriel_output("test_06"),
 
         };
 
