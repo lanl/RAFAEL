@@ -453,4 +453,103 @@ mod tests {
             dir_count
         );
     }
+
+    #[test]
+    fn purge_test_06_normal_run_puriel_enabled() {
+        testdir_setup("testing_artifacts/test_06/");
+        let _exception_file = File::create("testing_artifacts/test_06/exceptions.txt").unwrap();
+        let mut args = PurgeCli {
+            root: test_input_absolute("test_06"),
+            thread_count: 4,
+            rp_log_dir: test_output("test_06"),
+            age: 5,
+            exception: test_exception("test_06"),
+            ignore_ctime: true,
+            depth_protection: 1,
+            dry_run: false,
+            verbosity: 0,
+            show_progress: false,
+            entry_count: 0,
+            thread_stats: false,
+            erase: false,
+            read_entire_dir: false,
+            enable_puriel: true,
+            // By having puriel days set to 7, it is saying "What will be older than 5 days in 7 days", which should be all the files left over.
+            puriel_days: 7,
+            pr_target_dir: "pr_targets".into(),
+
+        };
+
+        let results = purge_fs(&mut args);
+        //Gather find results
+        let file_count = verify_with_find(false, find_input("test_06"));
+        let dir_count = verify_with_find(true, find_input("test_06"));
+
+        assert_eq!(
+            results
+                .purge_statistics
+                .files_checked
+                .load(Ordering::Relaxed),
+            1360
+        );
+        assert_eq!(
+            results
+                .purge_statistics
+                .files_purged
+                .load(Ordering::Relaxed),
+            1020
+        );
+        assert_eq!(
+            results
+                .purge_statistics
+                .puriel_items.unwrap()
+                .load(Ordering::Relaxed),
+            (results
+                .purge_statistics
+                .files_checked
+                .load(Ordering::Relaxed)
+            -
+            results
+                .purge_statistics
+                .files_purged
+                .load(Ordering::Relaxed)
+            )
+        );
+        assert_eq!(
+            results
+                .purge_statistics
+                .directories_checked
+                .load(Ordering::Relaxed),
+            341
+        );
+        assert_eq!(
+            results
+                .directories_purged_statistics
+                .0
+                .load(Ordering::Relaxed),
+            168
+        );
+        assert_eq!(
+            results
+                .purge_statistics
+                .files_checked
+                .load(Ordering::Relaxed)
+                - results
+                    .purge_statistics
+                    .files_purged
+                    .load(Ordering::Relaxed),
+            file_count
+        );
+        assert_eq!(
+            results
+                .purge_statistics
+                .directories_checked
+                .load(Ordering::Relaxed)
+                - results
+                    .directories_purged_statistics
+                    .0
+                    .load(Ordering::Relaxed),
+            dir_count
+        );
+    }
 }
