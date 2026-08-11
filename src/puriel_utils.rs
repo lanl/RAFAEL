@@ -162,14 +162,14 @@ fn worker_main(
     while let Some(target) = worker_queue.pop() {
         let target_metadata = match do_statx_cwd(&target) {
             Ok(metadata) => metadata,
-            Err(e) => {
+            Err(_) => {
                 puriel_stats
                     .target_statx_errors
                     .fetch_add(1, Ordering::Relaxed);
                 continue;
             }
         };
-        match process_puriel_statx(&target_metadata) {
+        match process_puriel_statx(&target_metadata, args) {
             EntryPurgeState::PurgeNow => match args.dry_run {
                 false => match fs::remove_file(&target) {
                     Ok(_) => {
