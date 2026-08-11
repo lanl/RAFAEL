@@ -163,7 +163,9 @@ fn worker_main(
         let target_metadata = match do_statx_cwd(&target) {
             Ok(metadata) => metadata,
             Err(e) => {
-                puriel_stats.target_statx_errors.fetch_add(1, Ordering::Relaxed);
+                puriel_stats
+                    .target_statx_errors
+                    .fetch_add(1, Ordering::Relaxed);
                 continue;
             }
         };
