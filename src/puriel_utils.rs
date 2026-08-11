@@ -2,6 +2,7 @@
 // Copyright 2026. Triad National Security, LLC.
 
 use crate::metadata_utils::{EntryPurgeState, do_statx_cwd, process_puriel_statx};
+use crate::syslog_utility::send_puriel_syslog_message;
 
 use clap::Parser;
 use crossbeam::queue::SegQueue;
@@ -14,9 +15,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 use std::thread;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
-//use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -44,11 +43,21 @@ pub struct Cli {
     #[arg(short = 't', long)]
     #[arg(default_value_t = 4)] // Default of 4 threads
     pub thread_count: usize,
+
+    /// Dry Run mode, will not delete directories or files that are purgable
+    #[arg(long)]
+    pub dry_run: bool,
+
 }
 
 pub struct PurielStatistics {
     pub targets_found: AtomicUsize,
     pub targets_purged: AtomicUsize,
+}
+
+pub struct PurielResults {
+    pub stats: PurielStatistics,
+    pub time: Duration,
 }
 
 // Reads in our puriel files and loads the targets into multiple segqueues based on number of threads
@@ -230,34 +239,47 @@ fn write_to_puriuel_log_file<W: Write>(
     }
 }
 
-fn display_puriel_results(stats: &PurielStatistics, start_time: std::time::Instant) {
+pub fn display_puriel_results(results: PurielResults, args: &Cli) {
     println!("\nPURIEL STATISTICS");
     println!("{}", "*".repeat(50));
     println!(
         "* Targets Found: {}",
-        stats.targets_found.load(Ordering::Relaxed)
+        results.stats.targets_found.load(Ordering::Relaxed)
     );
     println!(
         "* Targets Purged: {}",
-        stats.targets_purged.load(Ordering::Relaxed)
+        results.stats.targets_purged.load(Ordering::Relaxed)
     );
     println!("{}", "*".repeat(50));
-    println!("\n* Puriel Execution Time: {:.4?}", start_time.elapsed());
+    println!("\n* Puriel Execution Time: {:.4?}", results.time);
+
+    send_puriel_syslog_message(Some(results), args, false);
 }
 
-pub fn puriel_main(args: &Cli, stats: &PurielStatistics, start: std::time::Instant) {
+pub fn puriel_main(args: &Cli, start: std::time::Instant) -> PurielResults{
+    //Create our Puriel statistics
+    let puriel_stats = PurielStatistics {
+        targets_found: AtomicUsize::new(0),
+        targets_purged: AtomicUsize::new(0),
+    };
+
     //Get the number of targets we have and populate our worker queues
     let Ok((number_of_targets, worker_queues)) = populate_worker_queues(args) else {
         todo!()
     };
 
     //Set the number of targets we found in our puriel statistics
-    stats
+    puriel_stats
         .targets_found
         .store(number_of_targets, Ordering::Relaxed);
 
     //Launch our workers
-    launch_workers(args, worker_queues, &Arc::new(stats));
+    launch_workers(args, worker_queues, &Arc::new(&puriel_stats));
 
-    display_puriel_results(stats, start);
+    let return_results = PurielResults{
+        stats: puriel_stats,
+        time: start.elapsed(),
+    };
+
+    return_results
 }
