@@ -15,6 +15,10 @@ path = "src/bin/maketree.rs"
 name = "rafael"
 path = "src/bin/rafael_main.rs"
 
+[[bin]]
+name = "puriel"
+path = "src/bin/puriel_main.rs"
+
 [dependencies]
 rand = "0.8.5"
 chrono = "0.4"
