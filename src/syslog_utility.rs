@@ -220,6 +220,14 @@ fn generate_puriel_finished_log(results: PurielResults, age: i64, dry_run: bool)
                 .load(Ordering::Relaxed)
                 .to_string(),
         ),
+        (
+            "Target_statx_Errors",
+            results
+                .stats
+                .target_statx_errors
+                .load(Ordering::Relaxed)
+                .to_string(),
+        ),
     ];
 
     let mut message = String::from("");

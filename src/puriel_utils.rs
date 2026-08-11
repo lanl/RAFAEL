@@ -52,6 +52,7 @@ pub struct Cli {
 pub struct PurielStatistics {
     pub targets_found: AtomicUsize,
     pub targets_purged: AtomicUsize,
+    pub target_statx_errors: AtomicUsize,
 }
 
 pub struct PurielResults {
@@ -162,7 +163,7 @@ fn worker_main(
         let target_metadata = match do_statx_cwd(&target) {
             Ok(metadata) => metadata,
             Err(e) => {
-                eprintln!("{}", e);
+                puriel_stats.target_statx_errors.fetch_add(1, Ordering::Relaxed);
                 continue;
             }
         };
@@ -275,6 +276,10 @@ pub fn display_puriel_results(results: PurielResults, args: &Cli) {
         },
         results.stats.targets_purged.load(Ordering::Relaxed)
     );
+    println!(
+        "* Target statx Errors: {}",
+        results.stats.target_statx_errors.load(Ordering::Relaxed)
+    );
     println!("{}", "*".repeat(50));
     println!("\n* Puriel Execution Time: {:.4?}", results.time);
 
@@ -286,12 +291,18 @@ pub fn puriel_main(args: &Cli, start: std::time::Instant) -> PurielResults {
     let puriel_stats = PurielStatistics {
         targets_found: AtomicUsize::new(0),
         targets_purged: AtomicUsize::new(0),
+        target_statx_errors: AtomicUsize::new(0),
     };
+
+    //Benchmarking value for time to read in puriel targets
+    let read_in_time = std::time::Instant::now();
 
     //Get the number of targets we have and populate our worker queues
     let Ok((number_of_targets, worker_queues)) = populate_worker_queues(args) else {
         todo!()
     };
+
+    println!("Puriel targets read in time: {:?}", read_in_time.elapsed());
 
     //Set the number of targets we found in our puriel statistics
     puriel_stats
