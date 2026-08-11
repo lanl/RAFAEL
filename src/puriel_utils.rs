@@ -47,7 +47,6 @@ pub struct Cli {
     /// Dry Run mode, will not delete directories or files that are purgable
     #[arg(long)]
     pub dry_run: bool,
-
 }
 
 pub struct PurielStatistics {
@@ -168,28 +167,9 @@ fn worker_main(
             }
         };
         match process_puriel_statx(&target_metadata) {
-            EntryPurgeState::PurgeNow => 
-                match args.dry_run{
-                    false => {
-                        match fs::remove_file(&target) {
-                            Ok(_) => {
-                                puriel_stats.targets_purged.fetch_add(1, Ordering::Relaxed);
-                                write_to_puriuel_log_file(
-                                    args.dry_run,
-                                    &mut worker_log_file,
-                                    &target,
-                                    target_metadata.stx_atime.tv_sec,
-                                    target_metadata.stx_ctime.tv_sec,
-                                    target_metadata.stx_mtime.tv_sec,
-                                    target_metadata.stx_uid,
-                                )
-                            }
-                            Err(e) => {
-                                eprintln!("Error deleting target {}: {}", &target.display(), e);
-                            }
-                        }
-                    },
-                    true => {
+            EntryPurgeState::PurgeNow => match args.dry_run {
+                false => match fs::remove_file(&target) {
+                    Ok(_) => {
                         puriel_stats.targets_purged.fetch_add(1, Ordering::Relaxed);
                         write_to_puriuel_log_file(
                             args.dry_run,
@@ -201,7 +181,23 @@ fn worker_main(
                             target_metadata.stx_uid,
                         )
                     }
+                    Err(e) => {
+                        eprintln!("Error deleting target {}: {}", &target.display(), e);
+                    }
+                },
+                true => {
+                    puriel_stats.targets_purged.fetch_add(1, Ordering::Relaxed);
+                    write_to_puriuel_log_file(
+                        args.dry_run,
+                        &mut worker_log_file,
+                        &target,
+                        target_metadata.stx_atime.tv_sec,
+                        target_metadata.stx_ctime.tv_sec,
+                        target_metadata.stx_mtime.tv_sec,
+                        target_metadata.stx_uid,
+                    )
                 }
+            },
 
             EntryPurgeState::NotPurgable => {
                 continue;
@@ -269,9 +265,13 @@ pub fn display_puriel_results(results: PurielResults, args: &Cli) {
     );
     println!(
         "* Targets {} Purged: {}",
-        match args.dry_run{
-            true => {"That Would Be"},
-            false => {""},
+        match args.dry_run {
+            true => {
+                "That Would Be"
+            }
+            false => {
+                ""
+            }
         },
         results.stats.targets_purged.load(Ordering::Relaxed)
     );
@@ -281,7 +281,7 @@ pub fn display_puriel_results(results: PurielResults, args: &Cli) {
     send_puriel_syslog_message(Some(results), args, false);
 }
 
-pub fn puriel_main(args: &Cli, start: std::time::Instant) -> PurielResults{
+pub fn puriel_main(args: &Cli, start: std::time::Instant) -> PurielResults {
     //Create our Puriel statistics
     let puriel_stats = PurielStatistics {
         targets_found: AtomicUsize::new(0),
@@ -301,7 +301,7 @@ pub fn puriel_main(args: &Cli, start: std::time::Instant) -> PurielResults{
     //Launch our workers
     launch_workers(args, worker_queues, &Arc::new(&puriel_stats));
 
-    let return_results = PurielResults{
+    let return_results = PurielResults {
         stats: puriel_stats,
         time: start.elapsed(),
     };

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use rafael::puriel_utils::{Cli, puriel_main, display_puriel_results};
+use rafael::puriel_utils::{Cli, display_puriel_results, puriel_main};
 use rafael::syslog_utility::send_puriel_syslog_message;
 
 use chrono::Local;
@@ -23,13 +23,9 @@ fn main() {
     ));
     let _ = fs::create_dir(&args.pr_log_dir);
 
-
-
     send_puriel_syslog_message(None, &args, true);
 
     let results = puriel_main(&args, start);
 
     display_puriel_results(results, &args);
-
-
 }
