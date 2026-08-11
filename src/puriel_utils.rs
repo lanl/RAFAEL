@@ -168,22 +168,41 @@ fn worker_main(
             }
         };
         match process_puriel_statx(&target_metadata) {
-            EntryPurgeState::PurgeNow => match fs::remove_file(&target) {
-                Ok(_) => {
-                    puriel_stats.targets_purged.fetch_add(1, Ordering::Relaxed);
-                    write_to_puriuel_log_file(
-                        &mut worker_log_file,
-                        &target,
-                        target_metadata.stx_atime.tv_sec,
-                        target_metadata.stx_ctime.tv_sec,
-                        target_metadata.stx_mtime.tv_sec,
-                        target_metadata.stx_uid,
-                    )
+            EntryPurgeState::PurgeNow => 
+                match args.dry_run{
+                    false => {
+                        match fs::remove_file(&target) {
+                            Ok(_) => {
+                                puriel_stats.targets_purged.fetch_add(1, Ordering::Relaxed);
+                                write_to_puriuel_log_file(
+                                    args.dry_run,
+                                    &mut worker_log_file,
+                                    &target,
+                                    target_metadata.stx_atime.tv_sec,
+                                    target_metadata.stx_ctime.tv_sec,
+                                    target_metadata.stx_mtime.tv_sec,
+                                    target_metadata.stx_uid,
+                                )
+                            }
+                            Err(e) => {
+                                eprintln!("Error deleting target {}: {}", &target.display(), e);
+                            }
+                        }
+                    },
+                    true => {
+                        puriel_stats.targets_purged.fetch_add(1, Ordering::Relaxed);
+                        write_to_puriuel_log_file(
+                            args.dry_run,
+                            &mut worker_log_file,
+                            &target,
+                            target_metadata.stx_atime.tv_sec,
+                            target_metadata.stx_ctime.tv_sec,
+                            target_metadata.stx_mtime.tv_sec,
+                            target_metadata.stx_uid,
+                        )
+                    }
                 }
-                Err(e) => {
-                    eprintln!("Error deleting target {}: {}", &target.display(), e);
-                }
-            },
+
             EntryPurgeState::NotPurgable => {
                 continue;
             }
@@ -215,6 +234,7 @@ pub fn write_to_puriel_target_file(
 }
 
 fn write_to_puriuel_log_file<W: Write>(
+    dry_run: bool,
     log_file_writer: &mut BufWriter<W>,
     target_path: &PathBuf,
     atime: i64,
@@ -222,9 +242,10 @@ fn write_to_puriuel_log_file<W: Write>(
     mtime: i64,
     uid: u32,
 ) {
+    let msg = if dry_run { "WOULD DELETE" } else { "DELETING" };
     if let Err(e) = writeln!(
         log_file_writer,
-        "{}: DELETING {}: atime={} ctime={} mtime={} UID={}",
+        "{}: {msg} {}: atime={} ctime={} mtime={} UID={}",
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Epoch Calcuation error")
@@ -247,7 +268,11 @@ pub fn display_puriel_results(results: PurielResults, args: &Cli) {
         results.stats.targets_found.load(Ordering::Relaxed)
     );
     println!(
-        "* Targets Purged: {}",
+        "* Targets {} Purged: {}",
+        match args.dry_run{
+            true => {"That Would Be"},
+            false => {""},
+        },
         results.stats.targets_purged.load(Ordering::Relaxed)
     );
     println!("{}", "*".repeat(50));
