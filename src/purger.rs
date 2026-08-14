@@ -125,6 +125,12 @@ pub struct PurgeStatistics {
     pub puriel_items: Option<AtomicUsize>,
 }
 
+impl PurgeStatistics {
+    pub fn get_puriel_items(&self) -> &AtomicUsize {
+        self.puriel_items.as_ref().unwrap()
+    }
+}
+
 pub struct WorkItem {
     pub path: PathBuf,
     pub parent: Option<Arc<PurgeCandidate>>,

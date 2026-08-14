@@ -136,19 +136,33 @@ pub fn process_file_statx(
 }
 
 pub fn process_puriel_statx(metadata: &Statx, args: &PurielCli) -> EntryPurgeState {
-    if three_way_max(
-        metadata.stx_atime.tv_sec,
-        metadata.stx_ctime.tv_sec,
-        metadata.stx_mtime.tv_sec,
-    ) < ((SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Epoch calculation error")
-        .as_secs() as i64)
-        - (DAY_IN_SECS * args.age))
-    {
-        EntryPurgeState::PurgeNow
+    if args.ignore_ctime {
+        if std::cmp::max(metadata.stx_atime.tv_sec, metadata.stx_mtime.tv_sec)
+            < ((SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Epoch calculation error")
+                .as_secs() as i64)
+                - (DAY_IN_SECS * args.age))
+        {
+            return EntryPurgeState::PurgeNow;
+        } else {
+            return EntryPurgeState::NotPurgable;
+        }
     } else {
-        EntryPurgeState::NotPurgable
+        if three_way_max(
+            metadata.stx_atime.tv_sec,
+            metadata.stx_ctime.tv_sec,
+            metadata.stx_mtime.tv_sec,
+        ) < ((SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Epoch calculation error")
+            .as_secs() as i64)
+            - (DAY_IN_SECS * args.age))
+        {
+            return EntryPurgeState::PurgeNow;
+        } else {
+            return EntryPurgeState::NotPurgable;
+        }
     }
 }
 

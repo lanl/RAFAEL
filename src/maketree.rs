@@ -197,9 +197,11 @@ fn make_subtree(
 
 /// If a file or directory should be purgeable, then sets its timestamps to > 30 days ago.
 fn set_timestamps(path: &str, state: EntryPurgeState) {
-    match state{
+    match state {
         //Not Purgable will only return as that will be the non-purgable entries
-        EntryPurgeState::NotPurgable => {return;},
+        EntryPurgeState::NotPurgable => {
+            return;
+        }
         //Purgable Now will be 31 Days old, this is because in production and therefor in our tests we do a purge time of 30 days
         EntryPurgeState::PurgeNow => {
             let purgable_time = (SystemTime::now()
@@ -212,7 +214,7 @@ fn set_timestamps(path: &str, state: EntryPurgeState) {
             let m_time = FileTime::from_unix_time(purgable_time, 0);
 
             set_file_times(&path, a_time, m_time).unwrap();
-        },
+        }
         //Purge later, for puriel testing and unbalanced trees, will be 24 Days old.
         //Because puriel is run a week after the main purger in 7 days these entries will be 31 days old and therefor purgable in the future
         EntryPurgeState::PurgeLater => {

@@ -54,7 +54,7 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
         args.pr_target_dir = PathBuf::from(format!(
             "{}_{}",
             args.pr_target_dir.display(),
-            Local::now().format("%m-%d-%Y_%H:%M:%S").to_string()
+            Local::now().format("%m-%d-%Y").to_string()
         ));
         let _ = fs::create_dir(&args.pr_target_dir);
     }

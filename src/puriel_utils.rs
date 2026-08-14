@@ -4,6 +4,7 @@
 use crate::metadata_utils::{EntryPurgeState, do_statx_cwd, process_puriel_statx};
 use crate::syslog_utility::send_puriel_syslog_message;
 
+use chrono::Local;
 use clap::Parser;
 use crossbeam::queue::SegQueue;
 use std::fs;
@@ -38,6 +39,10 @@ pub struct Cli {
     #[arg(short = 'a', long)]
     #[arg(default_value_t = -1)]
     pub age: i64,
+
+    /// Ignore change time of files and only evaluate modify and access times
+    #[arg(long)]
+    pub ignore_ctime: bool,
 
     /// Thread count, Default of 4 threads.
     #[arg(short = 't', long)]
@@ -153,7 +158,10 @@ fn worker_main(
         ) {
         Ok(f) => BufWriter::new(f),
         Err(e) => {
-            eprintln!("Thread {} failed to create log file: {}", thread_index, e);
+            eprintln!(
+                "Puriel Thread {} failed to create log file: {}",
+                thread_index, e
+            );
             return;
         }
     };
@@ -288,7 +296,15 @@ pub fn display_puriel_results(results: PurielResults, args: &Cli) {
     send_puriel_syslog_message(Some(results), args, false);
 }
 
-pub fn puriel_main(args: &Cli, start: std::time::Instant) -> PurielResults {
+pub fn puriel_main(args: &mut Cli, start: std::time::Instant) -> PurielResults {
+    //Create log directory from command line arguments with current date and time
+    args.pr_log_dir = PathBuf::from(format!(
+        "{}_{}",
+        args.pr_log_dir.display(),
+        Local::now().format("%m-%d-%Y_%H:%M:%S").to_string()
+    ));
+    let _ = fs::create_dir(&args.pr_log_dir);
+
     //Create our Puriel statistics
     let puriel_stats = PurielStatistics {
         targets_found: AtomicUsize::new(0),

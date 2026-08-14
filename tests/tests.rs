@@ -6,7 +6,9 @@ mod tests {
     use rafael::maketree::{Cli, make_tree};
     use rafael::purger::Cli as PurgeCli;
     use rafael::purger_main::purge_fs;
+    use rafael::puriel_utils::{Cli as PurielCli, puriel_main};
 
+    use chrono::Local;
     use std::fs::{File, canonicalize};
     use std::io::Write;
     use std::path::PathBuf;
@@ -24,6 +26,32 @@ mod tests {
             purgable: true,
             data_size: 0,
             force: true,
+            unbalanced: false,
+        };
+        let result = make_tree(args);
+        match result {
+            Ok(values) => {
+                assert_eq!(values.num_dirs, 341);
+                assert_eq!(values.num_files, 1360);
+            }
+            Err(e) => {
+                eprintln!("Error getting return values: {}", e);
+            }
+        }
+    }
+
+    fn maketree_unbalanced_test(root_path: String) {
+        let args = Cli {
+            root: root_path,
+            depth: 4,
+            branching_factor: 4,
+            file_count: 4,
+            verbose: false,
+            interactive: false,
+            purgable: true,
+            data_size: 0,
+            force: true,
+            unbalanced: true,
         };
         let result = make_tree(args);
         match result {
@@ -80,6 +108,11 @@ mod tests {
         maketree_test(root_path.to_owned() + "fake_data_test");
     }
 
+    fn testdir_unbalanced_setup(root_path: &str) {
+        std::fs::create_dir_all(root_path.to_string()).unwrap();
+        maketree_unbalanced_test(root_path.to_owned() + "fake_data_test");
+    }
+
     fn find_input(test_name: &str) -> String {
         format!("testing_artifacts/{test_name}/fake_data_test")
     }
@@ -93,10 +126,18 @@ mod tests {
         format!("testing_artifacts/{test_name}/PURGER_TEST_RESULTS").into()
     }
 
-    fn test_puriel_output(test_name: &str) -> PathBuf {
-        format!("testing_artifacts/{test_name}/PURIEL_TEST_RESULTS").into()
+    fn test_rafael_puriel_output(test_name: &str) -> PathBuf {
+        format!("testing_artifacts/{test_name}/PURIEL_TARGETS").into()
     }
 
+    fn test_puriel_input_dir(test_name: &str) -> PathBuf {
+        let time_date = Local::now().format("%m-%d-%Y").to_string();
+        format!("testing_artifacts/{test_name}/PURIEL_TARGETS_{time_date}").into()
+    }
+
+    fn test_puriel_output(test_name: &str) -> PathBuf {
+        format!("testing_artifacts/{test_name}/PURIEL_OUTPUT").into()
+    }
     fn test_exception(test_name: &str) -> PathBuf {
         format!("testing_artifacts/{test_name}/exceptions.txt").into()
     }
@@ -456,13 +497,13 @@ mod tests {
 
     #[test]
     fn purge_test_06_normal_run_puriel_enabled() {
-        testdir_setup("testing_artifacts/test_06/");
+        testdir_unbalanced_setup("testing_artifacts/test_06/");
         let _exception_file = File::create("testing_artifacts/test_06/exceptions.txt").unwrap();
-        let mut args = PurgeCli {
+        let mut rafael_args = PurgeCli {
             root: test_input_absolute("test_06"),
-            thread_count: 4,
+            thread_count: 2,
             rp_log_dir: test_output("test_06"),
-            age: 5,
+            age: 30,
             exception: test_exception("test_06"),
             ignore_ctime: true,
             depth_protection: 1,
@@ -474,80 +515,126 @@ mod tests {
             erase: false,
             read_entire_dir: false,
             enable_puriel: true,
-            // By having puriel days set to 7, it is saying "What will be older than 5 days in 7 days", which should be all the files left over.
             puriel_days: 7,
-            pr_target_dir: test_puriel_output("test_06"),
+            pr_target_dir: test_rafael_puriel_output("test_06"),
         };
 
-        let results = purge_fs(&mut args);
-        //Gather find results
-        let file_count = verify_with_find(false, find_input("test_06"));
-        let dir_count = verify_with_find(true, find_input("test_06"));
+        let mut puriel_args = PurielCli {
+            puriel_target_dir: test_puriel_input_dir("test_06"),
+            pr_log_dir: test_puriel_output("test_06"),
+            age: 23,
+            ignore_ctime: true,
+            thread_count: 2,
+            dry_run: false,
+        };
+
+        //Launch rafael
+        let rafael_results = purge_fs(&mut rafael_args);
+
+        //Gather find results for rafael run
+        let rafael_file_count = verify_with_find(false, find_input("test_06"));
+        let rafael_dir_count = verify_with_find(true, find_input("test_06"));
+
+        //Launch Puriel
+        let puriuel_results = puriel_main(&mut puriel_args, std::time::Instant::now());
+
+        //Gather find results for puriel run
+        // let puriel_file_count = verify_with_find(false, find_input("test_06"));
+        // let puriel_dir_count = verify_with_find(true, find_input("test_06"));
 
         assert_eq!(
-            results
+            rafael_results
                 .purge_statistics
                 .files_checked
                 .load(Ordering::Relaxed),
             1360
         );
         assert_eq!(
-            results
+            rafael_results
                 .purge_statistics
                 .files_purged
                 .load(Ordering::Relaxed),
-            1020
+            680
         );
         assert_eq!(
-            results
+            *&rafael_results
                 .purge_statistics
-                .puriel_items
-                .unwrap()
+                .get_puriel_items()
                 .load(Ordering::Relaxed),
-            (results
+            (rafael_results
                 .purge_statistics
                 .files_checked
                 .load(Ordering::Relaxed)
-                - results
+                - rafael_results
                     .purge_statistics
                     .files_purged
                     .load(Ordering::Relaxed))
+                / 2
         );
         assert_eq!(
-            results
+            *&rafael_results
+                .purge_statistics
+                .get_puriel_items()
+                .load(Ordering::Relaxed),
+            340
+        );
+        assert_eq!(
+            rafael_results
                 .purge_statistics
                 .directories_checked
                 .load(Ordering::Relaxed),
             341
         );
         assert_eq!(
-            results
+            rafael_results
                 .directories_purged_statistics
                 .0
                 .load(Ordering::Relaxed),
-            168
+            0
         );
         assert_eq!(
-            results
+            rafael_results
                 .purge_statistics
                 .files_checked
                 .load(Ordering::Relaxed)
-                - results
+                - rafael_results
                     .purge_statistics
                     .files_purged
                     .load(Ordering::Relaxed),
-            file_count
+            rafael_file_count
         );
         assert_eq!(
-            results
+            rafael_results
                 .purge_statistics
                 .directories_checked
                 .load(Ordering::Relaxed)
-                - results
+                - rafael_results
                     .directories_purged_statistics
                     .0
                     .load(Ordering::Relaxed),
-            dir_count
+            rafael_dir_count
+        );
+        assert_eq!(
+            puriuel_results.stats.targets_found.load(Ordering::Relaxed),
+            rafael_results
+                .purge_statistics
+                .get_puriel_items()
+                .load(Ordering::Relaxed)
+        );
+        assert_eq!(
+            puriuel_results.stats.targets_found.load(Ordering::Relaxed),
+            340
+        );
+        assert_eq!(
+            puriuel_results.stats.targets_purged.load(Ordering::Relaxed),
+            340
+        );
+        assert_eq!(
+            puriuel_results
+                .stats
+                .target_statx_errors
+                .load(Ordering::Relaxed),
+            0
         );
     }
 }
