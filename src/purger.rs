@@ -171,7 +171,7 @@ pub fn root_dir_walk(
                     == SFlag::S_IFDIR
                 {
                     //Check if entry is an exception
-                    if is_dir_an_exception(exceptions, &path.display().to_string()) {
+                    if is_dir_an_exception(exceptions, &path.display().to_string().to_lowercase()) {
                         continue;
                     } else {
                         //Regardless of if the entry is a file dir or symlink put it in the work queues as we will handle that later.
@@ -352,6 +352,37 @@ fn worker_main(
                 eprintln!("thread dir scan, {}", e);
                 continue 'thread_scan_loop;
             }
+        }
+
+        //Flush the bufwriters after scanning a directory to catch any I/O errors
+        match worker_dlog_file.lock(){
+            Ok(mut log_file_writer) =>{
+                match log_file_writer.flush(){
+                    Ok(()) => {},
+                    Err(e) => {eprintln!("Error, failed to flush buffer for thread {} rafael log file: {}", thread_index, e);}
+                }
+            },
+            Err(e) => {
+                eprintln!("Mutex lock error for thread {}, rafael log file: {}", thread_index, e);
+            }
+        }
+        match puriel_target_file{
+            Some(ref mut target_file) => {
+                match target_file.flush(){
+                    Ok(()) => {},
+                    Err(e) => {eprintln!("Error, failed to flush buffer for thread {} puriel log file: {}", thread_index, e);}
+                }
+            },
+            None => {}
+        }
+        match path_traversal_log{
+            Some(ref mut traversal_log) => {
+                match traversal_log.flush(){
+                    Ok(()) => {},
+                    Err(e) => {eprintln!("Error, failed to flush buffer for thread {} traversal log file: {}", thread_index, e);}
+                }
+            },
+            None => {}
         }
     }
 
