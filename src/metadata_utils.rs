@@ -139,6 +139,9 @@ pub fn process_file_statx(
 pub fn process_puriel_statx(metadata: &Statx, args: &PurielCli) -> EntryPurgeState {
     match SFlag::from_bits_truncate(metadata.stx_mode.into()) & SFlag::S_IFMT {
         SFlag::S_IFREG | SFlag::S_IFSOCK | SFlag::S_IFLNK => {
+            if metadata.stx_uid == 0 {
+                return EntryPurgeState::NotPurgable;
+            }
             if args.ignore_ctime {
                 if exceeds_age_limit(
                     std::cmp::max(metadata.stx_atime.tv_sec, metadata.stx_mtime.tv_sec),
