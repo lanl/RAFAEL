@@ -137,28 +137,23 @@ pub fn process_file_statx(
 
 pub fn process_puriel_statx(metadata: &Statx, args: &PurielCli) -> EntryPurgeState {
     if args.ignore_ctime {
-        if std::cmp::max(metadata.stx_atime.tv_sec, metadata.stx_mtime.tv_sec)
-            < ((SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Epoch calculation error")
-                .as_secs() as i64)
-                - (DAY_IN_SECS * args.age))
-        {
+        if exceeds_age_limit(
+            std::cmp::max(metadata.stx_atime.tv_sec, metadata.stx_mtime.tv_sec),
+            args.age,
+        ) {
             return EntryPurgeState::PurgeNow;
         } else {
             return EntryPurgeState::NotPurgable;
         }
     } else {
-        if three_way_max(
-            metadata.stx_atime.tv_sec,
-            metadata.stx_ctime.tv_sec,
-            metadata.stx_mtime.tv_sec,
-        ) < ((SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Epoch calculation error")
-            .as_secs() as i64)
-            - (DAY_IN_SECS * args.age))
-        {
+        if exceeds_age_limit(
+            three_way_max(
+                metadata.stx_atime.tv_sec,
+                metadata.stx_ctime.tv_sec,
+                metadata.stx_mtime.tv_sec,
+            ),
+            args.age,
+        ) {
             return EntryPurgeState::PurgeNow;
         } else {
             return EntryPurgeState::NotPurgable;
@@ -204,7 +199,7 @@ pub fn is_entry_purgable(
             .as_secs() as i64;
 
         //If the entry was found to be purgable right now then there is no need to do a puriel calculation.
-        if newest_file_time < (current_epoch_time - (DAY_IN_SECS * args.age)) {
+        if exceeds_age_limit(newest_file_time, args.age) {
             return EntryPurgeState::PurgeNow;
         } else {
             //Do Puriel Calculations, I.E. if we are x days in the future is the entry older than our current age threshold in days
@@ -235,4 +230,13 @@ pub fn is_entry_purgable(
 
 fn three_way_max(t1: i64, t2: i64, t3: i64) -> i64 {
     std::cmp::max(t1, std::cmp::max(t2, t3))
+}
+
+fn exceeds_age_limit(entry_age: i64, age_in_days: i64) -> bool {
+    entry_age
+        < ((SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Epoch calculation error")
+            .as_secs() as i64)
+            - (DAY_IN_SECS * age_in_days))
 }

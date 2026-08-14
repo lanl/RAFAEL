@@ -421,10 +421,6 @@ mod tests {
         let mut exception_file = File::create("testing_artifacts/test_05/exceptions.txt").unwrap();
         exception_file.write_all("1\n2\n".as_bytes()).unwrap();
 
-        //Gather find results
-        // let pre_file_count = verify_with_find(false, find_input("test_05"));
-        // let pre_dir_count = verify_with_find(true, find_input("test_05"));
-
         let mut args = PurgeCli {
             root: test_input_absolute("test_05"),
             thread_count: 4,
