@@ -60,12 +60,22 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
     }
 
     //Check if an exception/purning file was passed
-    let mut exceptions: Vec<String> = Vec::new();
+    //let mut exceptions: Vec<String> = Vec::new();
 
     //Using unwrap on open(path) because we want the program to panic if the
     //Exception file cannot be read, we have no idea what it would delete at that point.
-    let buf = BufReader::new(fs::File::open(&args.exception).unwrap());
-    for exception in buf.lines() {
+
+    let (exception_reader, mut exceptions) = match fs::File::open(&args.exception) {
+        Ok(open_exception_file) => (BufReader::new(open_exception_file), Vec::new()),
+        Err(e) => {
+            eprintln!(
+                "Error reading exception file, {}, cannot safely proceed, Exiting: {e}",
+                &args.exception.display()
+            );
+            std::process::exit(1);
+        }
+    };
+    for exception in exception_reader.lines() {
         match exception {
             //Lowercase strings from exception file to follow case insensitive exceptions
             Ok(content) => exceptions.push(content.to_lowercase()),

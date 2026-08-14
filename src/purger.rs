@@ -33,8 +33,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[derive(Parser, Debug)]
 #[command(
     name = "rafael",
-    version = "2.3",
-    about = "\nRafael: Rust-Based Automated File-System Analyzer and Erasure Logger\nLast Updated: 02-25-2026"
+    version = "2.4.0",
+    about = "\nRafael: Rust-Based Automated File-System Analyzer and Erasure Logger\n"
 )]
 pub struct Cli {
     /// Root of tree to traverse and purge.
@@ -379,7 +379,7 @@ fn thread_directory_scan(
     //Open dir at a low level to get file descriptor along with NO_ATIME
     let mut dir = match Dir::open(
         &current_local_dir.path,
-        OFlag::O_DIRECTORY | OFlag::O_RDONLY | OFlag::O_NOATIME,
+        OFlag::O_DIRECTORY | OFlag::O_RDONLY | OFlag::O_NOATIME | OFlag::O_NOFOLLOW,
         Mode::empty(),
     ) {
         //This is where, if we initally got a file/symlink instead of a dir, will be handled.

@@ -5,6 +5,7 @@ use crate::purger::{Cli, PurgeStatistics, SharedLog, write_to_log_file};
 use crate::puriel_utils::Cli as PurielCli;
 use crate::puriel_utils::write_to_puriel_target_file;
 
+use nix::sys::stat::SFlag;
 use rustix::fd::BorrowedFd;
 use rustix::fs::{AtFlags, CWD, Statx, StatxFlags, statx};
 use std::fs;
@@ -136,26 +137,33 @@ pub fn process_file_statx(
 }
 
 pub fn process_puriel_statx(metadata: &Statx, args: &PurielCli) -> EntryPurgeState {
-    if args.ignore_ctime {
-        if exceeds_age_limit(
-            std::cmp::max(metadata.stx_atime.tv_sec, metadata.stx_mtime.tv_sec),
-            args.age,
-        ) {
-            return EntryPurgeState::PurgeNow;
-        } else {
-            return EntryPurgeState::NotPurgable;
+    match SFlag::from_bits_truncate(metadata.stx_mode.into()) & SFlag::S_IFMT {
+        SFlag::S_IFREG | SFlag::S_IFSOCK | SFlag::S_IFLNK => {
+            if args.ignore_ctime {
+                if exceeds_age_limit(
+                    std::cmp::max(metadata.stx_atime.tv_sec, metadata.stx_mtime.tv_sec),
+                    args.age,
+                ) {
+                    return EntryPurgeState::PurgeNow;
+                } else {
+                    return EntryPurgeState::NotPurgable;
+                }
+            } else {
+                if exceeds_age_limit(
+                    three_way_max(
+                        metadata.stx_atime.tv_sec,
+                        metadata.stx_ctime.tv_sec,
+                        metadata.stx_mtime.tv_sec,
+                    ),
+                    args.age,
+                ) {
+                    return EntryPurgeState::PurgeNow;
+                } else {
+                    return EntryPurgeState::NotPurgable;
+                }
+            }
         }
-    } else {
-        if exceeds_age_limit(
-            three_way_max(
-                metadata.stx_atime.tv_sec,
-                metadata.stx_ctime.tv_sec,
-                metadata.stx_mtime.tv_sec,
-            ),
-            args.age,
-        ) {
-            return EntryPurgeState::PurgeNow;
-        } else {
+        _ => {
             return EntryPurgeState::NotPurgable;
         }
     }

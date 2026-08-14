@@ -141,26 +141,26 @@ fn make_subtree(
                     if i % 2 == 0 {
                         //Within our even directories if we are making an unbalanced tree then all even numbered files will be purgable later
                         if j % 2 == 0 && args.unbalanced {
-                            set_timestamps(&fpath, EntryPurgeState::PurgeLater)
+                            set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeLater)
                         } else {
-                            set_timestamps(&fpath, EntryPurgeState::PurgeNow);
+                            set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeNow);
                         }
                     } else if i % 2 != 0 && j % 2 == 0 {
-                        set_timestamps(&fpath, EntryPurgeState::PurgeNow);
+                        set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeNow);
                     } else {
                     }
                 }
                 Some(true) => {
                     //Within our even directories if we are making an unbalanced tree then all even numbered files will be purgable later
                     if j % 2 == 0 && args.unbalanced {
-                        set_timestamps(&fpath, EntryPurgeState::PurgeLater)
+                        set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeLater)
                     } else {
-                        set_timestamps(&fpath, EntryPurgeState::PurgeNow);
+                        set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeNow);
                     }
                 }
                 Some(false) => {
                     if j % 2 == 0 {
-                        set_timestamps(&fpath, EntryPurgeState::PurgeNow);
+                        set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeNow);
                     } else {
                     }
                 }
@@ -173,7 +173,7 @@ fn make_subtree(
                 //Even Directories will be purgable
                 if i % 2 == 0 {
                     let _ = make_subtree(&path, depth - 1, args, Some(true));
-                    set_timestamps(&path, EntryPurgeState::PurgeNow);
+                    set_timestamps(args.purgable, &path, EntryPurgeState::PurgeNow);
                 }
                 //Odd Directories will not be purgable
                 else {
@@ -184,7 +184,7 @@ fn make_subtree(
             //Even Directories
             Some(true) => {
                 let _ = make_subtree(&path, depth - 1, args, Some(true));
-                set_timestamps(&path, EntryPurgeState::PurgeNow);
+                set_timestamps(args.purgable, &path, EntryPurgeState::PurgeNow);
             }
             //Odd Directories
             Some(false) => {
@@ -196,7 +196,10 @@ fn make_subtree(
 }
 
 /// If a file or directory should be purgeable, then sets its timestamps to > 30 days ago.
-fn set_timestamps(path: &str, state: EntryPurgeState) {
+fn set_timestamps(purgable_mode: bool, path: &str, state: EntryPurgeState) {
+    if !purgable_mode {
+        return;
+    }
     match state {
         //Not Purgable will only return as that will be the non-purgable entries
         EntryPurgeState::NotPurgable => {

@@ -12,6 +12,11 @@ fn main() {
 
     let mut args = Cli::parse();
 
+    if args.age >= 0 {
+        eprintln! {"Invalid puriel age, Exiting."}
+        std::process::exit(1);
+    }
+
     send_puriel_syslog_message(None, &args, true);
 
     let results = puriel_main(&mut args, start);

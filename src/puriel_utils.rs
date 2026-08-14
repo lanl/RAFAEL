@@ -7,6 +7,7 @@ use crate::syslog_utility::send_puriel_syslog_message;
 use chrono::Local;
 use clap::Parser;
 use crossbeam::queue::SegQueue;
+use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -21,7 +22,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[derive(Parser, Debug)]
 #[command(
     name = "puriel",
-    version = "0.1",
+    version = "0.1.0",
     about = "\nPuriel: Purge Utility for Removing Indexed and Expired Leftovers"
 )]
 
@@ -70,7 +71,7 @@ fn populate_worker_queues(
     args: &Cli,
 ) -> Result<(usize, Vec<crossbeam::queue::SegQueue<PathBuf>>), String> {
     //Creat our vector of targets, absolute paths
-    let mut target_paths = Vec::new();
+    let mut target_paths: Vec<PathBuf> = Vec::new();
 
     //Get the target files from the puriel target directory
     for entry in fs::read_dir(&args.puriel_target_dir).unwrap() {
@@ -81,26 +82,24 @@ fn populate_worker_queues(
         let file = match File::open(&ptf_path) {
             Ok(f) => f,
             Err(e) => {
-                eprintln!(
+                return Err(format!(
                     "Error opening puriel target file {}, {}",
                     ptf_path.display(),
                     e
-                );
-                std::process::exit(1);
+                ));
             }
         };
         for line in BufReader::new(file).lines() {
             match line {
                 Ok(target) => {
-                    target_paths.push(target);
+                    target_paths.push(PathBuf::from(OsString::from(target)));
                 }
                 Err(e) => {
-                    eprintln!(
+                    return Err(format!(
                         "Error reading line from target file {}, {}",
                         ptf_path.display(),
                         e
-                    );
-                    std::process::exit(1);
+                    ));
                 }
             }
         }
@@ -316,11 +315,19 @@ pub fn puriel_main(args: &mut Cli, start: std::time::Instant) -> PurielResults {
     let read_in_time = std::time::Instant::now();
 
     //Get the number of targets we have and populate our worker queues
-    let Ok((number_of_targets, worker_queues)) = populate_worker_queues(args) else {
-        todo!()
+    let (number_of_targets, worker_queues) = match populate_worker_queues(args) {
+        Ok((targets, queues)) => {
+            println!("Puriel targets read in time: {:?}", read_in_time.elapsed());
+            (targets, queues)
+        }
+        Err(e) => {
+            eprintln!(
+                "Error acquiring targets and populating worker queues: {}",
+                e
+            );
+            std::process::exit(1);
+        }
     };
-
-    println!("Puriel targets read in time: {:?}", read_in_time.elapsed());
 
     //Set the number of targets we found in our puriel statistics
     puriel_stats
