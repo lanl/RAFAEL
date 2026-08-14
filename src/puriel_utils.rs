@@ -307,7 +307,7 @@ pub fn puriel_main(args: &mut Cli, start: std::time::Instant) -> PurielResults {
         argument_error = true;
     }
 
-    if argument_error{
+    if argument_error {
         std::process::exit(1);
     }
 
