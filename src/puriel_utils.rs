@@ -296,6 +296,23 @@ pub fn display_puriel_results(results: PurielResults, args: &Cli) {
 }
 
 pub fn puriel_main(args: &mut Cli, start: std::time::Instant) -> PurielResults {
+    let mut argument_error: bool = false;
+    if args.age <= 0 {
+        eprintln!("Invalid puriel age, Exiting.");
+        argument_error = true;
+    }
+
+    if args.thread_count <= 0 {
+        eprintln!("Invalid thread count, Exiting.");
+        argument_error = true;
+    }
+
+    if argument_error{
+        std::process::exit(1);
+    }
+
+    send_puriel_syslog_message(None, &args, true);
+
     //Create log directory from command line arguments with current date and time
     args.pr_log_dir = PathBuf::from(format!(
         "{}_{}",

@@ -24,7 +24,7 @@ fn main() -> io::Result<()> {
     if args.age >= 0 && args.erase {
         eprintln!("Error: Cannot specify both --age and --erase.");
         argument_error = true;
-    } else if args.age == -1 && !args.erase {
+    } else if args.age <= -1 && !args.erase {
         eprintln!("Error: Must specify --age or --erase.");
         argument_error = true;
     }
