@@ -13,19 +13,19 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use log::debug;
 use nix::dir::{Dir, Entry};
 use nix::errno::Errno;
-use nix::fcntl::{OFlag, AT_FDCWD};
+use nix::fcntl::{AT_FDCWD, OFlag};
 use nix::sys::stat::Mode;
 use nix::sys::stat::SFlag;
 use nix::sys::statfs::statfs;
 use rustix::fd::BorrowedFd;
-use rustix::fs::{statx, AtFlags, StatxFlags};
+use rustix::fs::{AtFlags, StatxFlags, statx};
 use std::fs;
 use std::io::{BufWriter, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
+    atomic::{AtomicUsize, Ordering},
 };
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -33,8 +33,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[derive(Parser, Debug)]
 #[command(
     name = "rafael",
-    version = "2.3",
-    about = "\nRafael: Rust-Based Automated File-System Analyzer and Erasure Logger\nLast Updated: 02-25-2026"
+    version = "2.4.0",
+    about = "\nRafael: Rust-Based Automated File-System Analyzer and Erasure Logger\n"
 )]
 pub struct Cli {
     /// Root of tree to traverse and purge.
@@ -96,6 +96,23 @@ pub struct Cli {
     /// Delete all contents of specified root directory
     #[arg(long)]
     pub erase: bool,
+
+    #[arg(
+        long,
+        long_help = "Enable Puriel premptive purge calculations, This is argument is to be used in conjuntion with the program Puriel\n
+Puriel is a program that, at an admin determined time after Rafael has run, will run in order to purge files that were calculated\n"
+    )]
+    pub enable_puriel: bool,
+
+    /// Number of days ahead to evaluate whether currently non-purgeable items will become purgeable based on age constraints.
+    #[arg(long)]
+    #[arg(default_value_t = -1)]
+    pub puriel_days: i64,
+
+    /// With Puriel enabled a directory must be specified to output potential targets that each thread has found.
+    #[arg(long)]
+    #[arg(default_value = "pr_targets")]
+    pub pr_target_dir: PathBuf,
 }
 
 pub type SharedLog = Arc<Mutex<BufWriter<fs::File>>>;
@@ -105,6 +122,13 @@ pub struct PurgeStatistics {
     pub files_purged: AtomicUsize,
     pub directories_checked: AtomicUsize,
     pub directories_purged: AtomicUsize,
+    pub puriel_items: Option<AtomicUsize>,
+}
+
+impl PurgeStatistics {
+    pub fn get_puriel_items(&self) -> &AtomicUsize {
+        self.puriel_items.as_ref().unwrap()
+    }
 }
 
 pub struct WorkItem {
@@ -147,7 +171,7 @@ pub fn root_dir_walk(
                     == SFlag::S_IFDIR
                 {
                     //Check if entry is an exception
-                    if is_dir_an_exception(exceptions, &path.display().to_string()) {
+                    if is_dir_an_exception(exceptions, &path.display().to_string().to_lowercase()) {
                         continue;
                     } else {
                         //Regardless of if the entry is a file dir or symlink put it in the work queues as we will handle that later.
@@ -235,6 +259,28 @@ fn worker_main(
         }
     };
 
+    //Create Thread x's puriel file if puriel is enabled
+    let mut puriel_target_file: Option<BufWriter<fs::File>> = match args.enable_puriel {
+        true => {
+            match fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(
+                    &args
+                        .pr_target_dir
+                        .join(format!("worker-{}-puriel.target", thread_index)),
+                ) {
+                Ok(f) => Some(BufWriter::new(f)),
+                Err(e) => {
+                    eprintln!("Failed to create puriel log file: {}", e);
+                    return;
+                }
+            }
+        }
+        false => None,
+    };
+
     //Check or verbose level, 1 we should print our traversal to stdout, 2 we should be writing our path to a file
     let mut path_traversal_log: Option<BufWriter<fs::File>> = if args.verbosity == 2 {
         match fs::OpenOptions::new()
@@ -295,6 +341,7 @@ fn worker_main(
             dirs_purged_stats,
             work_queues,
             &worker_dlog_file,
+            &mut puriel_target_file,
             exceptions,
         ) {
             Ok(()) => {
@@ -305,6 +352,37 @@ fn worker_main(
                 eprintln!("thread dir scan, {}", e);
                 continue 'thread_scan_loop;
             }
+        }
+
+        //Flush the bufwriters after scanning a directory to catch any I/O errors
+        match worker_dlog_file.lock(){
+            Ok(mut log_file_writer) =>{
+                match log_file_writer.flush(){
+                    Ok(()) => {},
+                    Err(e) => {eprintln!("Error, failed to flush buffer for thread {} rafael log file: {}", thread_index, e);}
+                }
+            },
+            Err(e) => {
+                eprintln!("Mutex lock error for thread {}, rafael log file: {}", thread_index, e);
+            }
+        }
+        match puriel_target_file{
+            Some(ref mut target_file) => {
+                match target_file.flush(){
+                    Ok(()) => {},
+                    Err(e) => {eprintln!("Error, failed to flush buffer for thread {} puriel log file: {}", thread_index, e);}
+                }
+            },
+            None => {}
+        }
+        match path_traversal_log{
+            Some(ref mut traversal_log) => {
+                match traversal_log.flush(){
+                    Ok(()) => {},
+                    Err(e) => {eprintln!("Error, failed to flush buffer for thread {} traversal log file: {}", thread_index, e);}
+                }
+            },
+            None => {}
         }
     }
 
@@ -326,12 +404,13 @@ fn thread_directory_scan(
     dirs_purged_stats: &Arc<(AtomicUsize, AtomicUsize)>,
     worker_queues: &Vec<SegQueue<WorkItem>>,
     worker_log_file: &SharedLog,
+    worker_puriel_target_file: &mut Option<BufWriter<fs::File>>,
     exceptions: &Vec<String>,
 ) -> Result<(), String> {
     //Open dir at a low level to get file descriptor along with NO_ATIME
     let mut dir = match Dir::open(
         &current_local_dir.path,
-        OFlag::O_DIRECTORY | OFlag::O_RDONLY | OFlag::O_NOATIME,
+        OFlag::O_DIRECTORY | OFlag::O_RDONLY | OFlag::O_NOATIME | OFlag::O_NOFOLLOW,
         Mode::empty(),
     ) {
         //This is where, if we initally got a file/symlink instead of a dir, will be handled.
@@ -364,12 +443,18 @@ fn thread_directory_scan(
     };
 
     //Check if dir is purgable
-    let mut is_directory_purgable = is_entry_purgable(
+    let mut is_directory_purgable = match is_entry_purgable(
         args,
         &dir_metadata,
         current_local_dir.path.components().count(),
         true,
-    );
+    ) {
+        EntryPurgeState::PurgeNow => true,
+        EntryPurgeState::PurgeLater => {
+            unreachable!("Should Never return purge later for dir")
+        }
+        EntryPurgeState::NotPurgable => false,
+    };
 
     //First check if the dir is purgable and that it is NOT one of the root dirs children
     let new_parent = if is_directory_purgable {
@@ -417,6 +502,7 @@ fn thread_directory_scan(
                     &stats,
                     worker_queues,
                     worker_log_file,
+                    worker_puriel_target_file,
                     &new_parent,
                 );
                 count += 1;
@@ -435,6 +521,7 @@ fn thread_directory_scan(
                     &stats,
                     worker_queues,
                     worker_log_file,
+                    worker_puriel_target_file,
                     &new_parent,
                 );
                 count += 1;
@@ -538,6 +625,21 @@ pub fn display_purge_results(args: &Cli, purge_results: PurgeResults, now: std::
             .files_purged
             .load(Ordering::Relaxed)
     );
+
+    if args.enable_puriel {
+        println!(
+            "\n* PURIEL FILES:\n* Puriel Items logged: {}",
+            match purge_results.purge_statistics.puriel_items {
+                Some(ref items) => {
+                    items.load(Ordering::Relaxed)
+                }
+                None => {
+                    unreachable!("Error: Trying to output puriel stats when not enabled");
+                }
+            }
+        )
+    }
+
     println!("\n* DIRECTORIES: ");
     println!(
         "* Directories checked: {}",

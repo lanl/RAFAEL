@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
+use crate::metadata_utils::EntryPurgeState;
+
 use clap::Parser;
-use filetime::{set_file_times, FileTime};
+use filetime::{FileTime, set_file_times};
 use rayon::prelude::*;
 use std::{
     fs,
@@ -10,7 +12,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-const THIRTY_DAYS_IN_SECS: i64 = 2592000;
+const DAY_IN_SECS: i64 = 86_400;
 
 #[derive(Parser, Debug)]
 pub struct Cli {
@@ -48,6 +50,10 @@ pub struct Cli {
     /// Write data to each file (in bytes), can view total size of file you will create with -i flag
     #[arg(short = 'w', long, default_value_t = 0)]
     pub data_size: u32,
+
+    /// Create an unbalanced purgable tree, where some files will be purgable now and others will be purgable at later date, to be used for puriel testing.
+    #[arg(short = 'u', long)]
+    pub unbalanced: bool,
 }
 
 pub struct MakeTreeStatistics {
@@ -103,7 +109,6 @@ pub fn make_tree(args: Cli) -> io::Result<MakeTreeStatistics> {
 }
 
 /// Creates a subtree of depth `depth` under `parent`.
-///
 /// Assumes `parent` exists.
 fn make_subtree(
     parent: &str,
@@ -134,18 +139,28 @@ fn make_subtree(
             match purgable_recursion_flag {
                 None => {
                     if i % 2 == 0 {
-                        set_timestamps(&fpath, args)
+                        //Within our even directories if we are making an unbalanced tree then all even numbered files will be purgable later
+                        if j % 2 == 0 && args.unbalanced {
+                            set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeLater)
+                        } else {
+                            set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeNow);
+                        }
                     } else if i % 2 != 0 && j % 2 == 0 {
-                        set_timestamps(&fpath, args)
+                        set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeNow);
                     } else {
                     }
                 }
                 Some(true) => {
-                    set_timestamps(&fpath, args);
+                    //Within our even directories if we are making an unbalanced tree then all even numbered files will be purgable later
+                    if j % 2 == 0 && args.unbalanced {
+                        set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeLater)
+                    } else {
+                        set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeNow);
+                    }
                 }
                 Some(false) => {
                     if j % 2 == 0 {
-                        set_timestamps(&fpath, args);
+                        set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeNow);
                     } else {
                     }
                 }
@@ -155,12 +170,12 @@ fn make_subtree(
         match purgable_recursion_flag {
             //First loop
             None => {
-                //Even Directories
+                //Even Directories will be purgable
                 if i % 2 == 0 {
                     let _ = make_subtree(&path, depth - 1, args, Some(true));
-                    set_timestamps(&path, args);
+                    set_timestamps(args.purgable, &path, EntryPurgeState::PurgeNow);
                 }
-                //Odd Directories
+                //Odd Directories will not be purgable
                 else {
                     let _ = make_subtree(&path, depth - 1, args, Some(false));
                 }
@@ -169,7 +184,7 @@ fn make_subtree(
             //Even Directories
             Some(true) => {
                 let _ = make_subtree(&path, depth - 1, args, Some(true));
-                set_timestamps(&path, args);
+                set_timestamps(args.purgable, &path, EntryPurgeState::PurgeNow);
             }
             //Odd Directories
             Some(false) => {
@@ -181,20 +196,43 @@ fn make_subtree(
 }
 
 /// If a file or directory should be purgeable, then sets its timestamps to > 30 days ago.
-fn set_timestamps(path: &str, args: &Cli) {
-    if !args.purgable {
+fn set_timestamps(purgable_mode: bool, path: &str, state: EntryPurgeState) {
+    if !purgable_mode {
         return;
     }
-    let purgable_time = (SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Epoch calculation error")
-        .as_secs() as i64)
-        - THIRTY_DAYS_IN_SECS * 2;
+    match state {
+        //Not Purgable will only return as that will be the non-purgable entries
+        EntryPurgeState::NotPurgable => {
+            return;
+        }
+        //Purgable Now will be 31 Days old, this is because in production and therefor in our tests we do a purge time of 30 days
+        EntryPurgeState::PurgeNow => {
+            let purgable_time = (SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Epoch calculation error")
+                .as_secs() as i64)
+                - DAY_IN_SECS * 31;
 
-    let a_time = FileTime::from_unix_time(purgable_time, 0);
-    let m_time = FileTime::from_unix_time(purgable_time, 0);
+            let a_time = FileTime::from_unix_time(purgable_time, 0);
+            let m_time = FileTime::from_unix_time(purgable_time, 0);
 
-    set_file_times(&path, a_time, m_time).unwrap();
+            set_file_times(&path, a_time, m_time).unwrap();
+        }
+        //Purge later, for puriel testing and unbalanced trees, will be 24 Days old.
+        //Because puriel is run a week after the main purger in 7 days these entries will be 31 days old and therefor purgable in the future
+        EntryPurgeState::PurgeLater => {
+            let purgable_time = (SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Epoch calculation error")
+                .as_secs() as i64)
+                - DAY_IN_SECS * 24;
+
+            let a_time = FileTime::from_unix_time(purgable_time, 0);
+            let m_time = FileTime::from_unix_time(purgable_time, 0);
+
+            set_file_times(&path, a_time, m_time).unwrap();
+        }
+    }
 }
 
 fn display_size(size: u64) -> String {
