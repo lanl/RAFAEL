@@ -17,6 +17,8 @@ use nix::fcntl::{AT_FDCWD, OFlag};
 use nix::sys::stat::Mode;
 use nix::sys::stat::SFlag;
 use nix::sys::statfs::statfs;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use rustix::fd::BorrowedFd;
 use rustix::fs::{AtFlags, StatxFlags, statx};
 use std::fs;
@@ -33,7 +35,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[derive(Parser, Debug)]
 #[command(
     name = "rafael",
-    version = "2.4.0",
+    version = "2.4.1",
     about = "\nRafael: Rust-Based Automated File-System Analyzer and Erasure Logger\n"
 )]
 pub struct Cli {
@@ -97,6 +99,10 @@ pub struct Cli {
     #[arg(long)]
     pub erase: bool,
 
+    /// Disable shuffling for the contents of our inital root directory
+    #[arg(short = 's', long)]
+    pub no_shuffle_root: bool,
+
     #[arg(
         long,
         long_help = "Enable Puriel premptive purge calculations, This is argument is to be used in conjuntion with the program Puriel\n
@@ -153,17 +159,22 @@ pub fn root_dir_walk(
     exceptions: &Vec<String>,
 ) -> Result<(), String> {
     // Attempt to read the entries in the root path
-    let Ok(entries) = fs::read_dir(&args.root) else {
-        eprintln!("Failed to read root directory");
-        std::process::exit(1);
+    let mut entries: Vec<PathBuf> = match fs::read_dir(&args.root) {
+        Ok(entry_iterator) => entry_iterator.map(|res| res.unwrap().path()).collect(),
+        Err(e) => {
+            eprintln!("Failed to read root directory: {}", e);
+            std::process::exit(1);
+        }
     };
+
+    // Shuffle the contents of our root directory walk to balance out workloads for extremely large file systems
+    if !args.no_shuffle_root {
+        entries.shuffle(&mut thread_rng());
+    }
 
     // Increment number of directories scanned for statistics for the root level directory
     stats.directories_checked.fetch_add(1, Ordering::Relaxed);
-    for (index, entry) in entries.enumerate() {
-        let Ok(entry) = entry else { continue };
-        let path = entry.path();
-
+    for (index, path) in entries.into_iter().enumerate() {
         //Run statx on top level item to ensure it is a directory and also not a directory symlink
         match do_statx(AT_FDCWD, &path) {
             Ok(entry_metadata) => {
@@ -174,7 +185,7 @@ pub fn root_dir_walk(
                     if is_dir_an_exception(exceptions, &path.display().to_string().to_lowercase()) {
                         continue;
                     } else {
-                        //Regardless of if the entry is a file dir or symlink put it in the work queues as we will handle that later.
+                        //Regardless of if the entry is a file, dir, or symlink put it in the work queues as we will handle that later.
                         //Otherwise we have to run statx for each item in the root dir, when we will have to do that later anyway.
                         //It will be handled later by the inital open call to the work item.
                         let item = WorkItem { path, parent: None };
@@ -355,31 +366,43 @@ fn worker_main(
         }
 
         //Flush the bufwriters after scanning a directory to catch any I/O errors
-        match worker_dlog_file.lock(){
-            Ok(mut log_file_writer) =>{
-                match log_file_writer.flush(){
-                    Ok(()) => {},
-                    Err(e) => {eprintln!("Error, failed to flush buffer for thread {} rafael log file: {}", thread_index, e);}
+        match worker_dlog_file.lock() {
+            Ok(mut log_file_writer) => match log_file_writer.flush() {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!(
+                        "Error, failed to flush buffer for thread {} rafael log file: {}",
+                        thread_index, e
+                    );
                 }
             },
             Err(e) => {
-                eprintln!("Mutex lock error for thread {}, rafael log file: {}", thread_index, e);
+                eprintln!(
+                    "Mutex lock error for thread {}, rafael log file: {}",
+                    thread_index, e
+                );
             }
         }
-        match puriel_target_file{
-            Some(ref mut target_file) => {
-                match target_file.flush(){
-                    Ok(()) => {},
-                    Err(e) => {eprintln!("Error, failed to flush buffer for thread {} puriel log file: {}", thread_index, e);}
+        match puriel_target_file {
+            Some(ref mut target_file) => match target_file.flush() {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!(
+                        "Error, failed to flush buffer for thread {} puriel log file: {}",
+                        thread_index, e
+                    );
                 }
             },
             None => {}
         }
-        match path_traversal_log{
-            Some(ref mut traversal_log) => {
-                match traversal_log.flush(){
-                    Ok(()) => {},
-                    Err(e) => {eprintln!("Error, failed to flush buffer for thread {} traversal log file: {}", thread_index, e);}
+        match path_traversal_log {
+            Some(ref mut traversal_log) => match traversal_log.flush() {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!(
+                        "Error, failed to flush buffer for thread {} traversal log file: {}",
+                        thread_index, e
+                    );
                 }
             },
             None => {}
