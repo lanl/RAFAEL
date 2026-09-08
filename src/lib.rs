@@ -7,5 +7,5 @@ pub mod pct;
 pub mod purger;
 pub mod purger_main;
 pub mod puriel_utils;
-pub mod thread_termination;
 pub mod syslog;
+pub mod thread_termination;
