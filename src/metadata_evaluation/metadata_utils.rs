@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::rafael_utils::rafael_utils::{Cli, PurgeStatistics, SharedLog, write_to_log_file};
 use crate::puriel_utils::puriel_utils::Cli as PurielCli;
 use crate::puriel_utils::puriel_utils::write_to_puriel_target_file;
+use crate::rafael_utils::rafael_utils::{Cli, PurgeStatistics, SharedLog, write_to_log_file};
 
 use nix::sys::stat::SFlag;
 use rustix::fd::BorrowedFd;

@@ -3,7 +3,9 @@
 
 use crate::metadata_evaluation::metadata_utils::*;
 use crate::pct::purge_tree_utils::PurgeCandidate;
-use crate::rafael_utils::rafael_utils::{Cli, PurgeStatistics, SharedLog, WorkItem, is_dir_an_exception};
+use crate::rafael_utils::rafael_utils::{
+    Cli, PurgeStatistics, SharedLog, WorkItem, is_dir_an_exception,
+};
 
 use crossbeam::queue::SegQueue;
 use log::debug;
