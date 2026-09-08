@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use rafael::puriel_utils::{Cli, display_puriel_results, puriel_main};
+use rafael::puriel_utils::puriel_utils::{Cli, display_puriel_results, puriel_main};
 
 use clap::Parser;
 
