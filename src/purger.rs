@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::entry_evaluation::evaluate_entry;
-use crate::metadata_utils::*;
-use crate::purge_tree_utils::PurgeCandidate;
-use crate::safra::*;
-use crate::syslog_utility::send_syslog_message;
+use crate::metadata_evaluation::entry_evaluation::evaluate_entry;
+use crate::metadata_evaluation::metadata_utils::*;
+use crate::pct::purge_tree_utils::PurgeCandidate;
+use crate::thread_termination::safra::*;
+use crate::syslog::syslog_utility::send_syslog_message;
 
 use clap::{ArgAction, Parser};
 use crossbeam::queue::SegQueue;

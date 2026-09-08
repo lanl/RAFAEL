@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::metadata_utils::*;
-use crate::purge_tree_utils::PurgeCandidate;
+use crate::metadata_evaluation::metadata_utils::*;
+use crate::pct::purge_tree_utils::PurgeCandidate;
 use crate::purger::{Cli, PurgeStatistics, SharedLog, WorkItem, is_dir_an_exception};
 
 use crossbeam::queue::SegQueue;

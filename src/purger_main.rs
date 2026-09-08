@@ -4,9 +4,9 @@
 use crate::purger::{
     Cli, PurgeResults, PurgeStatistics, WorkItem, get_used_inodes, root_dir_walk, thread_main,
 };
-use crate::safra::SafraTerminator;
+use crate::thread_termination::safra::SafraTerminator;
 
-// use rafael::syslog_utility::send_syslog_message;
+// use rafael::syslog::syslog_utility::send_syslog_message;
 use chrono::Local;
 use crossbeam::queue::SegQueue;
 use std::fs;

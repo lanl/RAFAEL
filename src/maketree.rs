@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::metadata_utils::EntryPurgeState;
+use crate::metadata_evaluation::metadata_utils::EntryPurgeState;
 
 use clap::Parser;
 use filetime::{FileTime, set_file_times};
