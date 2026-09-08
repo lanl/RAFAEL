@@ -1,17 +1,41 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use rafael::puriel_utils::puriel_utils::{Cli, display_puriel_results, puriel_main};
+use rafael::puriel_utils::puriel_utils::{Cli, display_puriel_results};
+use rafael::puriel_utils::puriel_main::purge_fs;
+use rafael::syslog::syslog_utility::send_puriel_syslog_message;
 
 use clap::Parser;
+use std::io;
 
-fn main() {
+
+fn main() -> io::Result<()> {
     //Benchmarking variable
     let start = std::time::Instant::now();
 
     let mut args = Cli::parse();
 
-    let results = puriel_main(&mut args, start);
+    let mut argument_error: bool = false;
+    if args.age <= 0 {
+        eprintln!("Invalid puriel age, Exiting.");
+        argument_error = true;
+    }
+
+    if args.thread_count <= 0 {
+        eprintln!("Invalid thread count, Exiting.");
+        argument_error = true;
+    }
+
+    if argument_error {
+        std::process::exit(1);
+    }
+
+    //Send Puriel syslog start message
+    send_puriel_syslog_message(None, &args, true);
+
+    //Start puriel purge
+    let results = purge_fs(&mut args, start);
 
     display_puriel_results(results, &args);
+    Ok(())
 }

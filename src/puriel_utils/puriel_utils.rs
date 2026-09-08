@@ -6,7 +6,6 @@ use crate::metadata_evaluation::metadata_utils::{
 };
 use crate::syslog::syslog_utility::send_puriel_syslog_message;
 
-use chrono::Local;
 use clap::Parser;
 use crossbeam::queue::SegQueue;
 use std::ffi::OsString;
@@ -15,7 +14,6 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
 };
 use std::thread;
@@ -69,7 +67,7 @@ pub struct PurielResults {
 }
 
 // Reads in our puriel files and loads the targets into multiple segqueues based on number of threads
-fn populate_worker_queues(
+pub fn populate_worker_queues(
     args: &Cli,
 ) -> Result<(usize, Vec<crossbeam::queue::SegQueue<PathBuf>>), String> {
     //Creat our vector of targets, absolute paths
@@ -122,7 +120,7 @@ fn populate_worker_queues(
     Ok((number_of_targets, worker_queues))
 }
 
-fn launch_workers(
+pub fn launch_workers(
     args: &Cli,
     mut worker_queues: Vec<SegQueue<PathBuf>>,
     puriel_stats: &PurielStatistics,
@@ -295,71 +293,4 @@ pub fn display_puriel_results(results: PurielResults, args: &Cli) {
     println!("\n* Puriel Execution Time: {:.4?}", results.time);
 
     send_puriel_syslog_message(Some(results), args, false);
-}
-
-pub fn puriel_main(args: &mut Cli, start: std::time::Instant) -> PurielResults {
-    let mut argument_error: bool = false;
-    if args.age <= 0 {
-        eprintln!("Invalid puriel age, Exiting.");
-        argument_error = true;
-    }
-
-    if args.thread_count <= 0 {
-        eprintln!("Invalid thread count, Exiting.");
-        argument_error = true;
-    }
-
-    if argument_error {
-        std::process::exit(1);
-    }
-
-    send_puriel_syslog_message(None, &args, true);
-
-    //Create log directory from command line arguments with current date and time
-    args.pr_log_dir = PathBuf::from(format!(
-        "{}_{}",
-        args.pr_log_dir.display(),
-        Local::now().format("%m-%d-%Y_%H:%M:%S").to_string()
-    ));
-    let _ = fs::create_dir(&args.pr_log_dir);
-
-    //Create our Puriel statistics
-    let puriel_stats = PurielStatistics {
-        targets_found: AtomicUsize::new(0),
-        targets_purged: AtomicUsize::new(0),
-        target_statx_errors: AtomicUsize::new(0),
-    };
-
-    //Benchmarking value for time to read in puriel targets
-    let read_in_time = std::time::Instant::now();
-
-    //Get the number of targets we have and populate our worker queues
-    let (number_of_targets, worker_queues) = match populate_worker_queues(args) {
-        Ok((targets, queues)) => {
-            println!("Puriel targets read in time: {:?}", read_in_time.elapsed());
-            (targets, queues)
-        }
-        Err(e) => {
-            eprintln!(
-                "Error acquiring targets and populating worker queues: {}",
-                e
-            );
-            std::process::exit(1);
-        }
-    };
-
-    //Set the number of targets we found in our puriel statistics
-    puriel_stats
-        .targets_found
-        .store(number_of_targets, Ordering::Relaxed);
-
-    //Launch our workers
-    launch_workers(args, worker_queues, &Arc::new(&puriel_stats));
-
-    let return_results = PurielResults {
-        stats: puriel_stats,
-        time: start.elapsed(),
-    };
-
-    return_results
 }
