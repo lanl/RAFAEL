@@ -3,9 +3,12 @@ use crate::puriel_utils::puriel_utils::{
 };
 
 use chrono::Local;
-use std::sync::{Arc, atomic::{AtomicUsize,Ordering}};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 
 pub fn purge_fs(args: &mut Cli, start: std::time::Instant) -> PurielResults {
     //Create log directory from command line arguments with current date and time

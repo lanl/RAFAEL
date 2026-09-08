@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use rafael::puriel_utils::puriel_utils::{Cli, display_puriel_results};
 use rafael::puriel_utils::puriel_main::purge_fs;
+use rafael::puriel_utils::puriel_utils::{Cli, display_puriel_results};
 use rafael::syslog::syslog_utility::send_puriel_syslog_message;
 
 use clap::Parser;
 use std::io;
-
 
 fn main() -> io::Result<()> {
     //Benchmarking variable
