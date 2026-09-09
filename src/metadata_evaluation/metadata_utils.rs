@@ -2,7 +2,7 @@
 // Copyright 2026. Triad National Security, LLC.
 
 use crate::puriel_utils::{Cli as PurielCli, write_to_puriel_target_file};
-use crate::rafael_utils::rafael_utils::{Cli, PurgeStatistics, SharedLog, write_to_log_file};
+use crate::rafael_utils::{Cli, PurgeStatistics, SharedLog, write_to_log_file};
 
 use nix::sys::stat::SFlag;
 use rustix::fd::BorrowedFd;

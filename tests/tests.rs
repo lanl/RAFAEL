@@ -5,8 +5,7 @@
 mod tests {
     use rafael::maketree::maketree::{Cli, make_tree};
     use rafael::puriel_utils::{Cli as PurielCli, purge_fs as puriel_main};
-    use rafael::rafael_utils::rafael_main::purge_fs;
-    use rafael::rafael_utils::rafael_utils::Cli as PurgeCli;
+    use rafael::rafael_utils::{Cli as PurgeCli, purge_fs};
 
     use chrono::Local;
     use std::fs::{File, canonicalize};
