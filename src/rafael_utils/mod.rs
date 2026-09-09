@@ -3,7 +3,7 @@
 
 use crate::metadata_evaluation::entry_evaluation::evaluate_entry;
 use crate::metadata_evaluation::metadata_utils::*;
-use crate::pct::purge_tree_utils::PurgeCandidate;
+use crate::pct::PurgeCandidate;
 use crate::syslog::send_rafael_syslog_message;
 use crate::thread_termination::safra::SafraTerminator;
 use crate::thread_termination::safra::*;
