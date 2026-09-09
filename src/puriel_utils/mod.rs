@@ -22,7 +22,6 @@ use std::sync::{
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-
 #[derive(Parser, Debug)]
 #[command(
     name = "puriel",

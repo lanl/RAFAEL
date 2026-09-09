@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::thread_termination::safra::SafraTerminator;
 use crate::metadata_evaluation::entry_evaluation::evaluate_entry;
 use crate::metadata_evaluation::metadata_utils::*;
 use crate::pct::purge_tree_utils::PurgeCandidate;
 use crate::syslog::syslog_utility::send_syslog_message;
+use crate::thread_termination::safra::SafraTerminator;
 use crate::thread_termination::safra::*;
 
 use chrono::Local;
-use std::io::{BufRead, BufReader};
 use clap::{ArgAction, Parser};
 use crossbeam::queue::SegQueue;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -25,6 +24,7 @@ use rand::thread_rng;
 use rustix::fd::BorrowedFd;
 use rustix::fs::{AtFlags, StatxFlags, statx};
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::io::{BufWriter, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
