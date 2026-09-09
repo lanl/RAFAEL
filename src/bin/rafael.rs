@@ -2,7 +2,7 @@
 // Copyright 2026. Triad National Security, LLC.
 
 use rafael::rafael_utils::{Cli, display_purge_results, purge_fs};
-use rafael::syslog::syslog_utility::send_syslog_message;
+use rafael::syslog::send_rafael_syslog_message;
 
 use clap::Parser;
 use std::io;
@@ -33,7 +33,7 @@ fn main() -> io::Result<()> {
     }
 
     //Send Syslog start message
-    send_syslog_message(None, &args, true);
+    send_rafael_syslog_message(None, &args, true);
 
     //Set up our environment logger
     env_logger::init();

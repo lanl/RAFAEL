@@ -4,7 +4,7 @@
 use crate::metadata_evaluation::entry_evaluation::evaluate_entry;
 use crate::metadata_evaluation::metadata_utils::*;
 use crate::pct::purge_tree_utils::PurgeCandidate;
-use crate::syslog::syslog_utility::send_syslog_message;
+use crate::syslog::send_rafael_syslog_message;
 use crate::thread_termination::safra::SafraTerminator;
 use crate::thread_termination::safra::*;
 
@@ -727,7 +727,7 @@ pub fn display_purge_results(args: &Cli, purge_results: PurgeResults, now: std::
     println!("{}", "*".repeat(50));
 
     //Additionally if we successfully got our purge results also send a syslog info message to the local server
-    send_syslog_message(Some(purge_results), args, false)
+    send_rafael_syslog_message(Some(purge_results), args, false)
 }
 
 fn show_progress(

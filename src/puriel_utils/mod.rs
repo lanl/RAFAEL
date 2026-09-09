@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::syslog::syslog_utility::send_puriel_syslog_message;
-
+use crate::syslog::send_puriel_syslog_message;
 use crate::metadata_evaluation::metadata_utils::{
     EntryPurgeState, do_statx_cwd, process_puriel_statx,
 };

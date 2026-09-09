@@ -2,7 +2,7 @@
 // Copyright 2026. Triad National Security, LLC.
 
 use rafael::puriel_utils::{Cli, display_puriel_results, purge_fs};
-use rafael::syslog::syslog_utility::send_puriel_syslog_message;
+use rafael::syslog::send_puriel_syslog_message;
 
 use clap::Parser;
 use std::io;
