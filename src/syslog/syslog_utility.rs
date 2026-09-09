@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::puriel_utils::puriel_utils::{Cli as PurielCli, PurielResults};
+use crate::puriel_utils::{Cli as PurielCli, PurielResults};
 use crate::rafael_utils::rafael_utils::{Cli, PurgeResults};
 
 use std::sync::atomic::Ordering;

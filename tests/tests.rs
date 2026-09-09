@@ -4,8 +4,7 @@
 #[cfg(test)]
 mod tests {
     use rafael::maketree::maketree::{Cli, make_tree};
-    use rafael::puriel_utils::puriel_main::purge_fs as puriel_main;
-    use rafael::puriel_utils::puriel_utils::Cli as PurielCli;
+    use rafael::puriel_utils::{Cli as PurielCli, purge_fs as puriel_main};
     use rafael::rafael_utils::rafael_main::purge_fs;
     use rafael::rafael_utils::rafael_utils::Cli as PurgeCli;
 
