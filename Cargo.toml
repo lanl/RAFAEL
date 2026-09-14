@@ -1,6 +1,6 @@
 [package]
 name = "RAFAEL"
-version = "2.4.1"
+version = "2.4.2"
 edition = "2024"
 
 [lib]
@@ -13,11 +13,11 @@ path = "src/bin/maketree.rs"
 
 [[bin]]
 name = "rafael"
-path = "src/bin/rafael_main.rs"
+path = "src/bin/rafael.rs"
 
 [[bin]]
 name = "puriel"
-path = "src/bin/puriel_main.rs"
+path = "src/bin/puriel.rs"
 
 [dependencies]
 rand = "0.8.5"

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::purger::{Cli, PurgeResults};
 use crate::puriel_utils::{Cli as PurielCli, PurielResults};
+use crate::rafael_utils::{Cli, PurgeResults};
 
 use std::sync::atomic::Ordering;
 use syslog::{Facility, Formatter3164};
 
-pub fn send_syslog_message(results: Option<PurgeResults>, args: &Cli, start: bool) {
+pub fn send_rafael_syslog_message(results: Option<PurgeResults>, args: &Cli, start: bool) {
     //Define syslog formatter
     let formatter = Formatter3164 {
         facility: Facility::LOG_USER,
@@ -18,13 +18,13 @@ pub fn send_syslog_message(results: Option<PurgeResults>, args: &Cli, start: boo
 
     //Generate log message to send to syslog server
     let message = if start {
-        generate_start_log(
+        generate_rafael_start_log(
             args.root.display().to_string(),
             args.age.to_string(),
             args.dry_run.to_string(),
         )
     } else {
-        generate_finished_log(results.unwrap(), args.age, args.dry_run)
+        generate_rafael_finished_log(results.unwrap(), args.age, args.dry_run)
     };
 
     match syslog::unix(formatter) {
@@ -37,7 +37,7 @@ pub fn send_syslog_message(results: Option<PurgeResults>, args: &Cli, start: boo
     }
 }
 
-fn generate_start_log(root: String, age: String, dry_run: String) -> String {
+fn generate_rafael_start_log(root: String, age: String, dry_run: String) -> String {
     let fields = vec![
         ("Status", "Started"),
         ("Target", &root),
@@ -51,7 +51,7 @@ fn generate_start_log(root: String, age: String, dry_run: String) -> String {
     message
 }
 
-fn generate_finished_log(results: PurgeResults, age: i64, dry_run: bool) -> String {
+fn generate_rafael_finished_log(results: PurgeResults, age: i64, dry_run: bool) -> String {
     let fields = vec![
         ("Status", "Finished".to_string()),
         (

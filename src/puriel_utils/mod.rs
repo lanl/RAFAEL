@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::metadata_utils::{EntryPurgeState, do_statx_cwd, process_puriel_statx};
-use crate::syslog_utility::send_puriel_syslog_message;
+use crate::metadata_evaluation::metadata_utils::{
+    EntryPurgeState, do_statx_cwd, process_puriel_statx,
+};
+use crate::syslog::send_puriel_syslog_message;
 
 use chrono::Local;
 use clap::Parser;
@@ -22,7 +24,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[derive(Parser, Debug)]
 #[command(
     name = "puriel",
-    version = "0.1.0",
+    version = "0.1.1",
     about = "\nPuriel: Purge Utility for Removing Indexed and Expired Leftovers"
 )]
 
@@ -295,24 +297,7 @@ pub fn display_puriel_results(results: PurielResults, args: &Cli) {
     send_puriel_syslog_message(Some(results), args, false);
 }
 
-pub fn puriel_main(args: &mut Cli, start: std::time::Instant) -> PurielResults {
-    let mut argument_error: bool = false;
-    if args.age <= 0 {
-        eprintln!("Invalid puriel age, Exiting.");
-        argument_error = true;
-    }
-
-    if args.thread_count <= 0 {
-        eprintln!("Invalid thread count, Exiting.");
-        argument_error = true;
-    }
-
-    if argument_error {
-        std::process::exit(1);
-    }
-
-    send_puriel_syslog_message(None, &args, true);
-
+pub fn purge_fs(args: &mut Cli, start: std::time::Instant) -> PurielResults {
     //Create log directory from command line arguments with current date and time
     args.pr_log_dir = PathBuf::from(format!(
         "{}_{}",

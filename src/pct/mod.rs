@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::purger::{SharedLog, write_to_log_file};
+use crate::rafael_utils::{SharedLog, write_to_log_file};
 
 use rustix::fs::Statx;
 use std::fs;

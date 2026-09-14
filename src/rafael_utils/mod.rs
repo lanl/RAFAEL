@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright 2026. Triad National Security, LLC.
 
-use crate::entry_evaluation::evaluate_entry;
-use crate::metadata_utils::*;
-use crate::purge_tree_utils::PurgeCandidate;
-use crate::safra::*;
-use crate::syslog_utility::send_syslog_message;
+use crate::metadata_evaluation::entry_evaluation::evaluate_entry;
+use crate::metadata_evaluation::metadata_utils::*;
+use crate::pct::PurgeCandidate;
+use crate::syslog::send_rafael_syslog_message;
+use crate::thread_termination::safra::SafraTerminator;
+use crate::thread_termination::safra::*;
 
+use chrono::Local;
 use clap::{ArgAction, Parser};
 use crossbeam::queue::SegQueue;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -22,6 +24,7 @@ use rand::thread_rng;
 use rustix::fd::BorrowedFd;
 use rustix::fs::{AtFlags, StatxFlags, statx};
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::io::{BufWriter, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -35,7 +38,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[derive(Parser, Debug)]
 #[command(
     name = "rafael",
-    version = "2.4.1",
+    version = "2.4.2",
     about = "\nRafael: Rust-Based Automated File-System Analyzer and Erasure Logger\n"
 )]
 pub struct Cli {
@@ -724,7 +727,7 @@ pub fn display_purge_results(args: &Cli, purge_results: PurgeResults, now: std::
     println!("{}", "*".repeat(50));
 
     //Additionally if we successfully got our purge results also send a syslog info message to the local server
-    send_syslog_message(Some(purge_results), args, false)
+    send_rafael_syslog_message(Some(purge_results), args, false)
 }
 
 fn show_progress(
@@ -822,4 +825,108 @@ fn check_verbose_level(
             }
         }
     }
+}
+
+pub fn purge_fs(args: &mut Cli) -> PurgeResults {
+    //Benchmarking variable
+    let start = std::time::Instant::now();
+
+    // Directory Statistics (Directories purged, Directory Size Purged)
+    let directories_purged_stats = Arc::new((AtomicUsize::new(0), AtomicUsize::new(0)));
+
+    // Statistics and performance metrics
+    // Wrap them in Arc and Mutex
+    // 0 in front of u32 is the initial value of the mutex
+    let stats = PurgeStatistics {
+        files_checked: AtomicUsize::new(0),
+        files_purged: AtomicUsize::new(0),
+        directories_checked: AtomicUsize::new(0),
+        directories_purged: AtomicUsize::new(0),
+        puriel_items: match args.enable_puriel {
+            true => Some(AtomicUsize::new(0)),
+            false => None,
+        },
+    };
+
+    // Create a Vector of worker queues to be shared among threads
+    let top_level_queues: Vec<SegQueue<WorkItem>> = (0..args.thread_count)
+        .map(|_| SegQueue::<WorkItem>::new())
+        .collect();
+
+    //Create log directory from command line arguments with current date and time
+    args.rp_log_dir = PathBuf::from(format!(
+        "{}_{}",
+        args.rp_log_dir.display(),
+        Local::now().format("%m-%d-%Y_%H:%M:%S").to_string()
+    ));
+    let _ = fs::create_dir(&args.rp_log_dir);
+
+    //If puriel is enabled then create the puriel target directory with current date and time
+    if args.enable_puriel {
+        args.pr_target_dir = PathBuf::from(format!(
+            "{}_{}",
+            args.pr_target_dir.display(),
+            Local::now().format("%m-%d-%Y").to_string()
+        ));
+        let _ = fs::create_dir(&args.pr_target_dir);
+    }
+
+    //Check if an exception/purning file was passed
+    //let mut exceptions: Vec<String> = Vec::new();
+
+    //Using unwrap on open(path) because we want the program to panic if the
+    //Exception file cannot be read, we have no idea what it would delete at that point.
+
+    let (exception_reader, mut exceptions) = match fs::File::open(&args.exception) {
+        Ok(open_exception_file) => (BufReader::new(open_exception_file), Vec::new()),
+        Err(e) => {
+            eprintln!(
+                "Error reading exception file, {}, cannot safely proceed, Exiting: {e}",
+                &args.exception.display()
+            );
+            std::process::exit(1);
+        }
+    };
+    for exception in exception_reader.lines() {
+        match exception {
+            //Lowercase strings from exception file to follow case insensitive exceptions
+            Ok(content) => exceptions.push(content.to_lowercase()),
+            //Same here we want it to panic if it cannot read a line
+            //As that could end up deleting someones entire directory.
+            Err(e) => panic!(
+                "Error reading line in exception/pruning file.\
+            \nCannot proceed safely with program: {}",
+                e
+            ),
+        }
+    }
+
+    //Check if the status bar is set and if an entry count was pass, otherwise calculate the used inodes in the root dir
+    if args.show_progress && args.entry_count == 0 {
+        args.entry_count = get_used_inodes(&args.root);
+    }
+
+    // First "thread" that reads directories in root path
+    let _ = root_dir_walk(&args, &stats, &top_level_queues, &exceptions);
+
+    let term = SafraTerminator::new();
+
+    // Main thread function
+    thread_main(
+        &args,
+        &stats,
+        &Arc::clone(&directories_purged_stats),
+        &top_level_queues,
+        &exceptions,
+        &term,
+        &start,
+    );
+
+    let return_results = PurgeResults {
+        purge_statistics: stats,
+        time: start.elapsed(),
+        directories_purged_statistics: directories_purged_stats,
+    };
+
+    return_results
 }
