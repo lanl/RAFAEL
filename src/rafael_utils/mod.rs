@@ -38,7 +38,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[derive(Parser, Debug)]
 #[command(
     name = "rafael",
-    version = "2.4.1",
+    version = "2.4.2",
     about = "\nRafael: Rust-Based Automated File-System Analyzer and Erasure Logger\n"
 )]
 pub struct Cli {

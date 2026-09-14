@@ -24,7 +24,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[derive(Parser, Debug)]
 #[command(
     name = "puriel",
-    version = "0.1.0",
+    version = "0.1.1",
     about = "\nPuriel: Purge Utility for Removing Indexed and Expired Leftovers"
 )]
 
