@@ -405,6 +405,7 @@ fn worker_main(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn thread_directory_scan(
     args: &Cli,
     thread_position: usize,

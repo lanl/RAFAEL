@@ -17,6 +17,7 @@ use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+#[allow(clippy::too_many_arguments)]
 pub fn evaluate_entry(
     entry_result: Result<Entry, Errno>,
     args: &Cli,
