@@ -311,7 +311,7 @@ fn worker_main(
         let current_local_dir = match work_queues[thread_index].pop() {
             Some(work) => work,
             None => {
-                let Some(work) = try_stealing_work(args, work_queues) else {
+                let Some(work) = try_stealing_work(work_queues) else {
                     if term.check_termination(thread_index, local_term_state, args.thread_count) {
                         break 'thread_scan_loop;
                     }
@@ -545,12 +545,9 @@ fn thread_directory_scan(
 /////////////
 //UTILITIES//
 /////////////
-fn try_stealing_work(
-    args: &Cli,
-    work_queues: &[crossbeam::queue::SegQueue<WorkItem>],
-) -> Option<WorkItem> {
-    for i in 0..=args.thread_count - 1 {
-        if let Some(work) = work_queues[i].pop() {
+fn try_stealing_work(work_queues: &[crossbeam::queue::SegQueue<WorkItem>]) -> Option<WorkItem> {
+    for queue in work_queues {
+        if let Some(work) = queue.pop() {
             return Some(work);
         }
     }
