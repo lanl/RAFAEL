@@ -13,7 +13,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -27,7 +27,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
     version = "0.1.1",
     about = "\nPuriel: Purge Utility for Removing Indexed and Expired Leftovers"
 )]
-
 pub struct Cli {
     /// Puriel Targets Directory, should contain absolute path of files rafael has marked to investiage.
     #[arg(short = 'd', long)]
@@ -219,7 +218,7 @@ fn worker_main(
 //Used by rafael to populate puriel targets
 pub fn write_to_puriel_target_file(
     puriel_target_file: &mut Option<BufWriter<fs::File>>,
-    target_path: &PathBuf,
+    target_path: &Path,
 ) {
     if let Err(e) = writeln!(
         match puriel_target_file {
@@ -239,7 +238,7 @@ pub fn write_to_puriel_target_file(
 fn write_to_puriuel_log_file<W: Write>(
     dry_run: bool,
     log_file_writer: &mut BufWriter<W>,
-    target_path: &PathBuf,
+    target_path: &Path,
     atime: i64,
     ctime: i64,
     mtime: i64,

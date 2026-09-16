@@ -158,8 +158,8 @@ pub struct PurgeResults {
 pub fn root_dir_walk(
     args: &Cli,
     stats: &PurgeStatistics,
-    worker_queues: &Vec<SegQueue<WorkItem>>,
-    exceptions: &Vec<String>,
+    worker_queues: &[SegQueue<WorkItem>],
+    exceptions: &[String],
 ) -> Result<(), String> {
     // Attempt to read the entries in the root path
     let mut entries: Vec<PathBuf> = match fs::read_dir(&args.root) {
@@ -214,8 +214,8 @@ pub fn thread_main(
     args: &Cli,
     stats: &PurgeStatistics,
     dirs_purged_stats: &Arc<(AtomicUsize, AtomicUsize)>,
-    work_queues: &Vec<SegQueue<WorkItem>>,
-    exceptions: &Vec<String>,
+    work_queues: &[SegQueue<WorkItem>],
+    exceptions: &[String],
     term: &SafraTerminator,
     start: &Instant,
 ) {
@@ -248,8 +248,8 @@ fn worker_main(
     thread_index: usize,
     stats: &PurgeStatistics,
     dirs_purged_stats: &Arc<(AtomicUsize, AtomicUsize)>,
-    work_queues: &Vec<SegQueue<WorkItem>>,
-    exceptions: &Vec<String>,
+    work_queues: &[SegQueue<WorkItem>],
+    exceptions: &[String],
     term: &SafraTerminator,
 ) {
     //Thread x's local token/color
@@ -411,10 +411,10 @@ fn thread_directory_scan(
     current_local_dir: WorkItem,
     stats: &PurgeStatistics,
     dirs_purged_stats: &Arc<(AtomicUsize, AtomicUsize)>,
-    worker_queues: &Vec<SegQueue<WorkItem>>,
+    worker_queues: &[SegQueue<WorkItem>],
     worker_log_file: &SharedLog,
     worker_puriel_target_file: &mut Option<BufWriter<fs::File>>,
-    exceptions: &Vec<String>,
+    exceptions: &[String],
 ) -> Result<(), String> {
     //Open dir at a low level to get file descriptor along with NO_ATIME
     let mut dir = match Dir::open(
@@ -547,7 +547,7 @@ fn thread_directory_scan(
 /////////////
 fn try_stealing_work(
     args: &Cli,
-    work_queues: &Vec<crossbeam::queue::SegQueue<WorkItem>>,
+    work_queues: &[crossbeam::queue::SegQueue<WorkItem>],
 ) -> Option<WorkItem> {
     for i in 0..=args.thread_count - 1 {
         if let Some(work) = work_queues[i].pop() {
@@ -560,7 +560,7 @@ fn try_stealing_work(
 pub fn write_to_log_file(
     dry_run: bool,
     log_file: &SharedLog,
-    target_path: &PathBuf,
+    target_path: &Path,
     atime: i64,
     ctime: i64,
     mtime: i64,
@@ -586,7 +586,7 @@ pub fn write_to_log_file(
     }
 }
 
-pub fn is_dir_an_exception(exceptions: &Vec<String>, directory_to_check: &String) -> bool {
+pub fn is_dir_an_exception(exceptions: &[String], directory_to_check: &str) -> bool {
     exceptions
         .iter()
         .any(|exception| directory_to_check.contains(exception))

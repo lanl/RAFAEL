@@ -5,7 +5,7 @@ use crate::rafael_utils::{SharedLog, write_to_log_file};
 
 use rustix::fs::Statx;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -60,7 +60,7 @@ impl std::fmt::Display for PurgeCandidate {
 }
 impl PurgeCandidate {
     pub fn new(
-        path: &PathBuf,
+        path: &Path,
         parent: Option<Arc<PurgeCandidate>>,
         directories_purged_stats: Arc<(AtomicUsize, AtomicUsize)>,
         dry_run: bool,
@@ -68,7 +68,7 @@ impl PurgeCandidate {
         statx_md: Statx,
     ) -> PurgeCandidate {
         PurgeCandidate {
-            path: path.clone(),
+            path: path.to_path_buf(),
             parent,
             directories_purged_stats,
             delete: AtomicBool::new(true),

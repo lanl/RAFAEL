@@ -19,11 +19,6 @@ fn main() -> io::Result<()> {
         argument_error = true;
     }
 
-    if args.thread_count <= 0 {
-        eprintln!("Invalid thread count, Exiting.");
-        argument_error = true;
-    }
-
     if argument_error {
         std::process::exit(1);
     }
