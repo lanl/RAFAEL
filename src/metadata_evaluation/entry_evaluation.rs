@@ -47,7 +47,7 @@ pub fn evaluate_entry(
     }
 
     //Create our full entry path only after we have gone thorugh the "." and ".." case as those are gurantees
-    let entry_path = cstr_to_pathbuf_with_dir(&entry_name, current_local_dir_path);
+    let entry_path = cstr_to_pathbuf_with_dir(entry_name, current_local_dir_path);
 
     //Run statx on the entry
     match do_statx(dir_fd, &entry_path) {
@@ -59,17 +59,14 @@ pub fn evaluate_entry(
                 //Directory
                 SFlag::S_IFDIR => {
                     let temp_item = WorkItem {
-                        path: cstr_to_pathbuf_with_dir(
-                            &entry_name.to_owned(),
-                            current_local_dir_path,
-                        ),
+                        path: cstr_to_pathbuf_with_dir(entry_name, current_local_dir_path),
                         parent: new_parent.clone(),
                     };
                     //Check if directory is an exception/prunable, if so dont add it to a work queue
                     //Or if the directory is owned by root, if so also don't add it to a work queue
                     if is_dir_an_exception(
                         exceptions,
-                        &cstr_to_pathbuf_with_dir(&entry_name, current_local_dir_path)
+                        &cstr_to_pathbuf_with_dir(entry_name, current_local_dir_path)
                             .display()
                             .to_string()
                             .to_lowercase(),
@@ -89,7 +86,7 @@ pub fn evaluate_entry(
                 SFlag::S_IFREG | SFlag::S_IFSOCK | SFlag::S_IFLNK => {
                     match process_file_statx(
                         args,
-                        cstr_to_pathbuf_with_dir(&entry_name, current_local_dir_path),
+                        cstr_to_pathbuf_with_dir(entry_name, current_local_dir_path),
                         stats,
                         &entry_metadata,
                         worker_log_file,

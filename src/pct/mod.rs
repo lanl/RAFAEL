@@ -134,7 +134,7 @@ impl Drop for PurgeCandidate {
                         eprintln!(
                             "Error PurgeCandidate DROP trait: {}: {}",
                             e,
-                            &self.path.display()
+                            self.path.display()
                         );
                     }
                 }

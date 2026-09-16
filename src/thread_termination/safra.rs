@@ -19,6 +19,12 @@ pub struct SafraTerminator {
     token_holder: AtomicUsize,
     global_done: AtomicBool,
 }
+impl Default for SafraTerminator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SafraTerminator {
     pub fn new() -> Self {
         SafraTerminator {
@@ -83,7 +89,7 @@ impl SafraTerminator {
             }
             self.pass_token(thread_count, thread_id);
         }
-        return false;
+        false
     }
 
     fn pass_token(&self, thread_count: usize, thread_id: usize) {

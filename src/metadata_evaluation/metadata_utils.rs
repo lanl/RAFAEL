@@ -69,7 +69,7 @@ pub fn process_file_statx(
     stats.files_checked.fetch_add(1, Ordering::Relaxed);
 
     //Check if the file is purgable
-    let purge_state = is_entry_purgable(args, &file_metadata, 0, false);
+    let purge_state = is_entry_purgable(args, file_metadata, 0, false);
 
     //Check if we need to purge the file now, later, or if it is not purgable at all.
     match purge_state {
@@ -82,18 +82,18 @@ pub fn process_file_statx(
                         //Write to local log file
                         write_to_log_file(
                             false,
-                            &worker_log_file,
+                            worker_log_file,
                             &file_path,
                             file_metadata.stx_atime.tv_sec,
                             file_metadata.stx_ctime.tv_sec,
                             file_metadata.stx_mtime.tv_sec,
                             file_metadata.stx_uid,
                         );
-                        return true;
+                        true
                     }
                     Err(e) => {
-                        eprintln!("Error deleting {}: {}", file_path.display().to_string(), e);
-                        return false;
+                        eprintln!("Error deleting {}: {}", file_path.display(), e);
+                        false
                     }
                 }
             } else {
@@ -103,14 +103,14 @@ pub fn process_file_statx(
                 //Write to local log file
                 write_to_log_file(
                     true,
-                    &worker_log_file,
+                    worker_log_file,
                     &file_path,
                     file_metadata.stx_atime.tv_sec,
                     file_metadata.stx_ctime.tv_sec,
                     file_metadata.stx_mtime.tv_sec,
                     file_metadata.stx_uid,
                 );
-                return true;
+                true
             }
         }
         //If We received a file that is eligible for a later purge we write it to a puriel target file.
@@ -125,13 +125,11 @@ pub fn process_file_statx(
                     unreachable!("Puriel stats not initialized");
                 }
             }
-            return false;
+            false
         }
         //File was not purged and the directory was found to be purgable at the start
         //So now this directory we are in is no longer purgable
-        EntryPurgeState::NotPurgable => {
-            return false;
-        }
+        EntryPurgeState::NotPurgable => false,
     }
 }
 
@@ -146,9 +144,9 @@ pub fn process_puriel_statx(metadata: &Statx, args: &PurielCli) -> EntryPurgeSta
                     std::cmp::max(metadata.stx_atime.tv_sec, metadata.stx_mtime.tv_sec),
                     args.age,
                 ) {
-                    return EntryPurgeState::PurgeNow;
+                    EntryPurgeState::PurgeNow
                 } else {
-                    return EntryPurgeState::NotPurgable;
+                    EntryPurgeState::NotPurgable
                 }
             } else {
                 if exceeds_age_limit(
@@ -159,15 +157,13 @@ pub fn process_puriel_statx(metadata: &Statx, args: &PurielCli) -> EntryPurgeSta
                     ),
                     args.age,
                 ) {
-                    return EntryPurgeState::PurgeNow;
+                    EntryPurgeState::PurgeNow
                 } else {
-                    return EntryPurgeState::NotPurgable;
+                    EntryPurgeState::NotPurgable
                 }
             }
         }
-        _ => {
-            return EntryPurgeState::NotPurgable;
-        }
+        _ => EntryPurgeState::NotPurgable,
     }
 }
 
@@ -210,16 +206,16 @@ pub fn is_entry_purgable(
 
         //If the entry was found to be purgable right now then there is no need to do a puriel calculation.
         if exceeds_age_limit(newest_file_time, args.age) {
-            return EntryPurgeState::PurgeNow;
+            EntryPurgeState::PurgeNow
         } else {
             //Do Puriel Calculations, I.E. if we are x days in the future is the entry older than our current age threshold in days
             if newest_file_time
                 < (current_epoch_time + (DAY_IN_SECS * args.puriel_days - DAY_IN_SECS * args.age))
             {
-                return EntryPurgeState::PurgeLater;
+                EntryPurgeState::PurgeLater
             } else {
                 //Entry was found to not be purgable now or x days into the future
-                return EntryPurgeState::NotPurgable;
+                EntryPurgeState::NotPurgable
             }
         }
     //If we do not have puriel enabled then we will calulate if the age of entry qualifies for purging without initializing the threshold variable.
@@ -231,9 +227,9 @@ pub fn is_entry_purgable(
                 .as_secs() as i64
                 - (DAY_IN_SECS * args.age)
         {
-            return EntryPurgeState::PurgeNow;
+            EntryPurgeState::PurgeNow
         } else {
-            return EntryPurgeState::NotPurgable;
+            EntryPurgeState::NotPurgable
         }
     }
 }

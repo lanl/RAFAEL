@@ -136,7 +136,7 @@ fn launch_workers(
                     std::process::exit(1);
                 }
             };
-            s.spawn(move || worker_main(&args, i as usize, worker_queue, puriel_stats));
+            s.spawn(move || worker_main(args, i, worker_queue, puriel_stats));
         }
     })
 }
@@ -148,15 +148,10 @@ fn worker_main(
     puriel_stats: &PurielStatistics,
 ) {
     //Create Thread x's log file
-    let mut worker_log_file = match OpenOptions::new()
-        .create(true)
-        .write(true)
-        .append(true)
-        .open(
-            &args
-                .pr_log_dir
-                .join(format!("worker-{}-age-{}.log", thread_index, &args.age)),
-        ) {
+    let mut worker_log_file = match OpenOptions::new().create(true).append(true).open(
+        args.pr_log_dir
+            .join(format!("worker-{}-age-{}.log", thread_index, args.age)),
+    ) {
         Ok(f) => BufWriter::new(f),
         Err(e) => {
             eprintln!(
@@ -194,7 +189,7 @@ fn worker_main(
                         )
                     }
                     Err(e) => {
-                        eprintln!("Error deleting target {}: {}", &target.display(), e);
+                        eprintln!("Error deleting target {}: {}", target.display(), e);
                     }
                 },
                 true => {
@@ -302,7 +297,7 @@ pub fn purge_fs(args: &mut Cli, start: std::time::Instant) -> PurielResults {
     args.pr_log_dir = PathBuf::from(format!(
         "{}_{}",
         args.pr_log_dir.display(),
-        Local::now().format("%m-%d-%Y_%H:%M:%S").to_string()
+        Local::now().format("%m-%d-%Y_%H:%M:%S")
     ));
     let _ = fs::create_dir(&args.pr_log_dir);
 
@@ -339,10 +334,8 @@ pub fn purge_fs(args: &mut Cli, start: std::time::Instant) -> PurielResults {
     //Launch our workers
     launch_workers(args, worker_queues, &Arc::new(&puriel_stats));
 
-    let return_results = PurielResults {
+    PurielResults {
         stats: puriel_stats,
         time: start.elapsed(),
-    };
-
-    return_results
+    }
 }
