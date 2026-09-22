@@ -158,8 +158,8 @@ pub struct PurgeResults {
 pub fn root_dir_walk(
     args: &Cli,
     stats: &PurgeStatistics,
-    worker_queues: &Vec<SegQueue<WorkItem>>,
-    exceptions: &Vec<String>,
+    worker_queues: &[SegQueue<WorkItem>],
+    exceptions: &[String],
 ) -> Result<(), String> {
     // Attempt to read the entries in the root path
     let mut entries: Vec<PathBuf> = match fs::read_dir(&args.root) {
@@ -214,8 +214,8 @@ pub fn thread_main(
     args: &Cli,
     stats: &PurgeStatistics,
     dirs_purged_stats: &Arc<(AtomicUsize, AtomicUsize)>,
-    work_queues: &Vec<SegQueue<WorkItem>>,
-    exceptions: &Vec<String>,
+    work_queues: &[SegQueue<WorkItem>],
+    exceptions: &[String],
     term: &SafraTerminator,
     start: &Instant,
 ) {
@@ -226,11 +226,11 @@ pub fn thread_main(
             /////////////////
             s.spawn(move || {
                 worker_main(
-                    &args,
-                    i as usize,
+                    args,
+                    i,
                     stats,
                     dirs_purged_stats,
-                    &work_queues,
+                    work_queues,
                     exceptions,
                     term,
                 )
@@ -248,8 +248,8 @@ fn worker_main(
     thread_index: usize,
     stats: &PurgeStatistics,
     dirs_purged_stats: &Arc<(AtomicUsize, AtomicUsize)>,
-    work_queues: &Vec<SegQueue<WorkItem>>,
-    exceptions: &Vec<String>,
+    work_queues: &[SegQueue<WorkItem>],
+    exceptions: &[String],
     term: &SafraTerminator,
 ) {
     //Thread x's local token/color
@@ -257,15 +257,10 @@ fn worker_main(
     let mut local_term_state = TermState::Idle;
 
     //Create Thread x's log file
-    let worker_dlog_file: SharedLog = match fs::OpenOptions::new()
-        .create(true)
-        .write(true)
-        .append(true)
-        .open(
-            &args
-                .rp_log_dir
-                .join(format!("worker-{}-age-{}.log", thread_index, &args.age)),
-        ) {
+    let worker_dlog_file: SharedLog = match fs::OpenOptions::new().create(true).append(true).open(
+        args.rp_log_dir
+            .join(format!("worker-{}-age-{}.log", thread_index, args.age)),
+    ) {
         Ok(f) => Arc::new(Mutex::new(BufWriter::new(f))),
         Err(e) => {
             eprintln!("Thread {} failed to create log file: {}", thread_index, e);
@@ -276,15 +271,10 @@ fn worker_main(
     //Create Thread x's puriel file if puriel is enabled
     let mut puriel_target_file: Option<BufWriter<fs::File>> = match args.enable_puriel {
         true => {
-            match fs::OpenOptions::new()
-                .create(true)
-                .write(true)
-                .append(true)
-                .open(
-                    &args
-                        .pr_target_dir
-                        .join(format!("worker-{}-puriel.target", thread_index)),
-                ) {
+            match fs::OpenOptions::new().create(true).append(true).open(
+                args.pr_target_dir
+                    .join(format!("worker-{}-puriel.target", thread_index)),
+            ) {
                 Ok(f) => Some(BufWriter::new(f)),
                 Err(e) => {
                     eprintln!("Failed to create puriel log file: {}", e);
@@ -297,15 +287,10 @@ fn worker_main(
 
     //Check or verbose level, 1 we should print our traversal to stdout, 2 we should be writing our path to a file
     let mut path_traversal_log: Option<BufWriter<fs::File>> = if args.verbosity == 2 {
-        match fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .append(true)
-            .open(
-                &args
-                    .rp_log_dir
-                    .join(format!("worker-{}-traversal.log", thread_index)),
-            ) {
+        match fs::OpenOptions::new().create(true).append(true).open(
+            args.rp_log_dir
+                .join(format!("worker-{}-traversal.log", thread_index)),
+        ) {
             Ok(f) => Some(BufWriter::new(f)),
             Err(e) => {
                 eprintln!("Failed to create traversl log file: {}", e);
@@ -326,7 +311,7 @@ fn worker_main(
         let current_local_dir = match work_queues[thread_index].pop() {
             Some(work) => work,
             None => {
-                let Some(work) = try_stealing_work(args, work_queues) else {
+                let Some(work) = try_stealing_work(work_queues) else {
                     if term.check_termination(thread_index, local_term_state, args.thread_count) {
                         break 'thread_scan_loop;
                     }
@@ -386,8 +371,8 @@ fn worker_main(
                 );
             }
         }
-        match puriel_target_file {
-            Some(ref mut target_file) => match target_file.flush() {
+        if let Some(ref mut target_file) = puriel_target_file {
+            match target_file.flush() {
                 Ok(()) => {}
                 Err(e) => {
                     eprintln!(
@@ -395,11 +380,10 @@ fn worker_main(
                         thread_index, e
                     );
                 }
-            },
-            None => {}
+            }
         }
-        match path_traversal_log {
-            Some(ref mut traversal_log) => match traversal_log.flush() {
+        if let Some(ref mut traversal_log) = path_traversal_log {
+            match traversal_log.flush() {
                 Ok(()) => {}
                 Err(e) => {
                     eprintln!(
@@ -407,8 +391,7 @@ fn worker_main(
                         thread_index, e
                     );
                 }
-            },
-            None => {}
+            }
         }
     }
 
@@ -422,16 +405,17 @@ fn worker_main(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn thread_directory_scan(
     args: &Cli,
     thread_position: usize,
     current_local_dir: WorkItem,
     stats: &PurgeStatistics,
     dirs_purged_stats: &Arc<(AtomicUsize, AtomicUsize)>,
-    worker_queues: &Vec<SegQueue<WorkItem>>,
+    worker_queues: &[SegQueue<WorkItem>],
     worker_log_file: &SharedLog,
     worker_puriel_target_file: &mut Option<BufWriter<fs::File>>,
-    exceptions: &Vec<String>,
+    exceptions: &[String],
 ) -> Result<(), String> {
     //Open dir at a low level to get file descriptor along with NO_ATIME
     let mut dir = match Dir::open(
@@ -445,7 +429,7 @@ fn thread_directory_scan(
         Err(err) => {
             return Err(format!(
                 "Failed to open entry as a dir: {}, Error: {:?}",
-                &current_local_dir.path.display(),
+                current_local_dir.path.display(),
                 err,
             )
             .to_string());
@@ -463,7 +447,7 @@ fn thread_directory_scan(
     ) else {
         return Err(format!(
             "Directory statx operation failed: {}",
-            &current_local_dir.path.display()
+            current_local_dir.path.display()
         )
         .to_string());
     };
@@ -498,11 +482,8 @@ fn thread_directory_scan(
     //If current dir is not purgable then the parent cannot be purgable
     //So check if parent is purgable and if so change it
     } else {
-        match current_local_dir.parent {
-            Some(ref parent) => {
-                parent.set_delete_flag();
-            }
-            None => {}
+        if let Some(ref parent) = current_local_dir.parent {
+            parent.set_delete_flag();
         }
         None
     };
@@ -525,7 +506,7 @@ fn thread_directory_scan(
                     &current_local_dir.path,
                     exceptions,
                     &mut is_directory_purgable,
-                    &stats,
+                    stats,
                     worker_queues,
                     worker_log_file,
                     worker_puriel_target_file,
@@ -544,7 +525,7 @@ fn thread_directory_scan(
                     &current_local_dir.path,
                     exceptions,
                     &mut is_directory_purgable,
-                    &stats,
+                    stats,
                     worker_queues,
                     worker_log_file,
                     worker_puriel_target_file,
@@ -556,13 +537,8 @@ fn thread_directory_scan(
     }
     //Check if dir is still purgable after evaluating all of its entries.
     //If not then update the dir to no longer be purgable along with its parent.
-    if !is_directory_purgable {
-        match new_parent {
-            Some(ref parent) => {
-                parent.set_delete_flag();
-            }
-            None => {}
-        }
+    if !is_directory_purgable && let Some(ref parent) = new_parent {
+        parent.set_delete_flag();
     }
     Ok(())
 }
@@ -570,12 +546,9 @@ fn thread_directory_scan(
 /////////////
 //UTILITIES//
 /////////////
-fn try_stealing_work(
-    args: &Cli,
-    work_queues: &Vec<crossbeam::queue::SegQueue<WorkItem>>,
-) -> Option<WorkItem> {
-    for i in 0..=args.thread_count - 1 {
-        if let Some(work) = work_queues[i].pop() {
+fn try_stealing_work(work_queues: &[crossbeam::queue::SegQueue<WorkItem>]) -> Option<WorkItem> {
+    for queue in work_queues {
+        if let Some(work) = queue.pop() {
             return Some(work);
         }
     }
@@ -585,7 +558,7 @@ fn try_stealing_work(
 pub fn write_to_log_file(
     dry_run: bool,
     log_file: &SharedLog,
-    target_path: &PathBuf,
+    target_path: &Path,
     atime: i64,
     ctime: i64,
     mtime: i64,
@@ -611,7 +584,7 @@ pub fn write_to_log_file(
     }
 }
 
-pub fn is_dir_an_exception(exceptions: &Vec<String>, directory_to_check: &String) -> bool {
+pub fn is_dir_an_exception(exceptions: &[String], directory_to_check: &str) -> bool {
     exceptions
         .iter()
         .any(|exception| directory_to_check.contains(exception))
@@ -619,7 +592,7 @@ pub fn is_dir_an_exception(exceptions: &Vec<String>, directory_to_check: &String
 
 pub fn get_used_inodes(root_path: &Path) -> u64 {
     let stat = statfs(root_path).unwrap();
-    return stat.files() - stat.files_free();
+    stat.files() - stat.files_free()
 }
 
 /// Displays purge results at the end of a run
@@ -814,15 +787,15 @@ fn check_verbose_level(
 ) {
     if verbosity == 1 {
         println!("Thread {} has traveled to: {}", thread_index, path);
-    } else if verbosity == 2 {
-        if let Some(path_traversal_log_file) = path_traversal_log {
-            //Not including thread id on travel log file write because it will have the thread id in the file name
-            if let Err(e) = writeln!(path_traversal_log_file, "{}", path) {
-                eprintln!(
-                    "Error writing to path traversal file for thread {}: {}",
-                    thread_index, e
-                );
-            }
+    } else if verbosity == 2
+        && let Some(path_traversal_log_file) = path_traversal_log
+    {
+        //Not including thread id on travel log file write because it will have the thread id in the file name
+        if let Err(e) = writeln!(path_traversal_log_file, "{}", path) {
+            eprintln!(
+                "Error writing to path traversal file for thread {}: {}",
+                thread_index, e
+            );
         }
     }
 }
@@ -857,7 +830,7 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
     args.rp_log_dir = PathBuf::from(format!(
         "{}_{}",
         args.rp_log_dir.display(),
-        Local::now().format("%m-%d-%Y_%H:%M:%S").to_string()
+        Local::now().format("%m-%d-%Y_%H:%M:%S")
     ));
     let _ = fs::create_dir(&args.rp_log_dir);
 
@@ -866,7 +839,7 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
         args.pr_target_dir = PathBuf::from(format!(
             "{}_{}",
             args.pr_target_dir.display(),
-            Local::now().format("%m-%d-%Y").to_string()
+            Local::now().format("%m-%d-%Y")
         ));
         let _ = fs::create_dir(&args.pr_target_dir);
     }
@@ -882,7 +855,7 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
         Err(e) => {
             eprintln!(
                 "Error reading exception file, {}, cannot safely proceed, Exiting: {e}",
-                &args.exception.display()
+                args.exception.display()
             );
             std::process::exit(1);
         }
@@ -907,13 +880,13 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
     }
 
     // First "thread" that reads directories in root path
-    let _ = root_dir_walk(&args, &stats, &top_level_queues, &exceptions);
+    let _ = root_dir_walk(args, &stats, &top_level_queues, &exceptions);
 
     let term = SafraTerminator::new();
 
     // Main thread function
     thread_main(
-        &args,
+        args,
         &stats,
         &Arc::clone(&directories_purged_stats),
         &top_level_queues,
@@ -922,11 +895,9 @@ pub fn purge_fs(args: &mut Cli) -> PurgeResults {
         &start,
     );
 
-    let return_results = PurgeResults {
+    PurgeResults {
         purge_statistics: stats,
         time: start.elapsed(),
         directories_purged_statistics: directories_purged_stats,
-    };
-
-    return_results
+    }
 }

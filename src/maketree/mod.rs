@@ -66,7 +66,7 @@ pub fn make_tree(args: Cli) -> io::Result<MakeTreeStatistics> {
 
     let mut total_dirs: u64 = 0;
     for i in 0..=args.depth {
-        total_dirs += u64::from(args.branching_factor).pow(i as u32);
+        total_dirs += u64::from(args.branching_factor).pow(i);
     }
     let number_of_files = (total_dirs as i64 - 1) as u64 * args.file_count as u64;
     let total_size_of_files = (total_dirs - 1) * args.file_count as u64 * args.data_size as u64;
@@ -95,7 +95,7 @@ pub fn make_tree(args: Cli) -> io::Result<MakeTreeStatistics> {
         let _ = io::stdin().read(&mut [0u8]).unwrap();
     }
 
-    match fs::create_dir(&root) {
+    match fs::create_dir(root) {
         Ok(()) => {}
         Err(e) => {
             if !(e.kind() == io::ErrorKind::AlreadyExists && args.force) {
@@ -104,7 +104,7 @@ pub fn make_tree(args: Cli) -> io::Result<MakeTreeStatistics> {
         }
     };
 
-    make_subtree(&root, args.depth, &args, None)?;
+    make_subtree(root, args.depth, &args, None)?;
     Ok(return_stats)
 }
 
@@ -147,7 +147,6 @@ fn make_subtree(
                         }
                     } else if i % 2 != 0 && j % 2 == 0 {
                         set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeNow);
-                    } else {
                     }
                 }
                 Some(true) => {
@@ -161,7 +160,6 @@ fn make_subtree(
                 Some(false) => {
                     if j % 2 == 0 {
                         set_timestamps(args.purgable, &fpath, EntryPurgeState::PurgeNow);
-                    } else {
                     }
                 }
             }
@@ -202,9 +200,7 @@ fn set_timestamps(purgable_mode: bool, path: &str, state: EntryPurgeState) {
     }
     match state {
         //Not Purgable will only return as that will be the non-purgable entries
-        EntryPurgeState::NotPurgable => {
-            return;
-        }
+        EntryPurgeState::NotPurgable => {}
         //Purgable Now will be 31 Days old, this is because in production and therefor in our tests we do a purge time of 30 days
         EntryPurgeState::PurgeNow => {
             let purgable_time = (SystemTime::now()
@@ -216,7 +212,7 @@ fn set_timestamps(purgable_mode: bool, path: &str, state: EntryPurgeState) {
             let a_time = FileTime::from_unix_time(purgable_time, 0);
             let m_time = FileTime::from_unix_time(purgable_time, 0);
 
-            set_file_times(&path, a_time, m_time).unwrap();
+            set_file_times(path, a_time, m_time).unwrap();
         }
         //Purge later, for puriel testing and unbalanced trees, will be 24 Days old.
         //Because puriel is run a week after the main purger in 7 days these entries will be 31 days old and therefor purgable in the future
@@ -230,7 +226,7 @@ fn set_timestamps(purgable_mode: bool, path: &str, state: EntryPurgeState) {
             let a_time = FileTime::from_unix_time(purgable_time, 0);
             let m_time = FileTime::from_unix_time(purgable_time, 0);
 
-            set_file_times(&path, a_time, m_time).unwrap();
+            set_file_times(path, a_time, m_time).unwrap();
         }
     }
 }
@@ -241,7 +237,7 @@ fn display_size(size: u64) -> String {
     let mut i = 0;
     let mut size = size as f64;
     while size >= 1024. && i < suffixes.len() - 1 {
-        size = size / 1024.;
+        size /= 1024.;
         i += 1;
     }
 

@@ -13,7 +13,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -27,7 +27,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
     version = "0.1.1",
     about = "\nPuriel: Purge Utility for Removing Indexed and Expired Leftovers"
 )]
-
 pub struct Cli {
     /// Puriel Targets Directory, should contain absolute path of files rafael has marked to investiage.
     #[arg(short = 'd', long)]
@@ -136,7 +135,7 @@ fn launch_workers(
                     std::process::exit(1);
                 }
             };
-            s.spawn(move || worker_main(&args, i as usize, worker_queue, puriel_stats));
+            s.spawn(move || worker_main(args, i, worker_queue, puriel_stats));
         }
     })
 }
@@ -148,15 +147,10 @@ fn worker_main(
     puriel_stats: &PurielStatistics,
 ) {
     //Create Thread x's log file
-    let mut worker_log_file = match OpenOptions::new()
-        .create(true)
-        .write(true)
-        .append(true)
-        .open(
-            &args
-                .pr_log_dir
-                .join(format!("worker-{}-age-{}.log", thread_index, &args.age)),
-        ) {
+    let mut worker_log_file = match OpenOptions::new().create(true).append(true).open(
+        args.pr_log_dir
+            .join(format!("worker-{}-age-{}.log", thread_index, args.age)),
+    ) {
         Ok(f) => BufWriter::new(f),
         Err(e) => {
             eprintln!(
@@ -194,7 +188,7 @@ fn worker_main(
                         )
                     }
                     Err(e) => {
-                        eprintln!("Error deleting target {}: {}", &target.display(), e);
+                        eprintln!("Error deleting target {}: {}", target.display(), e);
                     }
                 },
                 true => {
@@ -224,7 +218,7 @@ fn worker_main(
 //Used by rafael to populate puriel targets
 pub fn write_to_puriel_target_file(
     puriel_target_file: &mut Option<BufWriter<fs::File>>,
-    target_path: &PathBuf,
+    target_path: &Path,
 ) {
     if let Err(e) = writeln!(
         match puriel_target_file {
@@ -244,7 +238,7 @@ pub fn write_to_puriel_target_file(
 fn write_to_puriuel_log_file<W: Write>(
     dry_run: bool,
     log_file_writer: &mut BufWriter<W>,
-    target_path: &PathBuf,
+    target_path: &Path,
     atime: i64,
     ctime: i64,
     mtime: i64,
@@ -302,7 +296,7 @@ pub fn purge_fs(args: &mut Cli, start: std::time::Instant) -> PurielResults {
     args.pr_log_dir = PathBuf::from(format!(
         "{}_{}",
         args.pr_log_dir.display(),
-        Local::now().format("%m-%d-%Y_%H:%M:%S").to_string()
+        Local::now().format("%m-%d-%Y_%H:%M:%S")
     ));
     let _ = fs::create_dir(&args.pr_log_dir);
 
@@ -339,10 +333,8 @@ pub fn purge_fs(args: &mut Cli, start: std::time::Instant) -> PurielResults {
     //Launch our workers
     launch_workers(args, worker_queues, &Arc::new(&puriel_stats));
 
-    let return_results = PurielResults {
+    PurielResults {
         stats: puriel_stats,
         time: start.elapsed(),
-    };
-
-    return_results
+    }
 }

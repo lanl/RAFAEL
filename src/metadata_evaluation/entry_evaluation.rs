@@ -17,16 +17,17 @@ use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+#[allow(clippy::too_many_arguments)]
 pub fn evaluate_entry(
     entry_result: Result<Entry, Errno>,
     args: &Cli,
     dir_fd: BorrowedFd,
     count: &usize,
-    current_local_dir_path: &PathBuf,
-    exceptions: &Vec<String>,
+    current_local_dir_path: &Path,
+    exceptions: &[String],
     is_directory_purgable: &mut bool,
     stats: &PurgeStatistics,
-    worker_queues: &Vec<SegQueue<WorkItem>>,
+    worker_queues: &[SegQueue<WorkItem>],
     worker_log_file: &SharedLog,
     worker_puriel_target_file: &mut Option<BufWriter<fs::File>>,
     new_parent: &Option<Arc<PurgeCandidate>>,
@@ -47,7 +48,7 @@ pub fn evaluate_entry(
     }
 
     //Create our full entry path only after we have gone thorugh the "." and ".." case as those are gurantees
-    let entry_path = cstr_to_pathbuf_with_dir(&entry_name, current_local_dir_path);
+    let entry_path = cstr_to_pathbuf_with_dir(entry_name, current_local_dir_path);
 
     //Run statx on the entry
     match do_statx(dir_fd, &entry_path) {
@@ -59,17 +60,14 @@ pub fn evaluate_entry(
                 //Directory
                 SFlag::S_IFDIR => {
                     let temp_item = WorkItem {
-                        path: cstr_to_pathbuf_with_dir(
-                            &entry_name.to_owned(),
-                            current_local_dir_path,
-                        ),
+                        path: cstr_to_pathbuf_with_dir(entry_name, current_local_dir_path),
                         parent: new_parent.clone(),
                     };
                     //Check if directory is an exception/prunable, if so dont add it to a work queue
                     //Or if the directory is owned by root, if so also don't add it to a work queue
                     if is_dir_an_exception(
                         exceptions,
-                        &cstr_to_pathbuf_with_dir(&entry_name, current_local_dir_path)
+                        &cstr_to_pathbuf_with_dir(entry_name, current_local_dir_path)
                             .display()
                             .to_string()
                             .to_lowercase(),
@@ -89,7 +87,7 @@ pub fn evaluate_entry(
                 SFlag::S_IFREG | SFlag::S_IFSOCK | SFlag::S_IFLNK => {
                     match process_file_statx(
                         args,
-                        cstr_to_pathbuf_with_dir(&entry_name, current_local_dir_path),
+                        cstr_to_pathbuf_with_dir(entry_name, current_local_dir_path),
                         stats,
                         &entry_metadata,
                         worker_log_file,

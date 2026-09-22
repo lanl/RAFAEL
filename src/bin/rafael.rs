@@ -42,6 +42,6 @@ fn main() -> io::Result<()> {
     let results = purge_fs(&mut args);
 
     //Display our results and send a syslog message with our results
-    display_purge_results(&mut args, results, now);
+    display_purge_results(&args, results, now);
     Ok(())
 }
