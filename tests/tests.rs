@@ -27,16 +27,10 @@ mod tests {
             force: true,
             unbalanced: false,
         };
-        let result = make_tree(args);
-        match result {
-            Ok(values) => {
-                assert_eq!(values.num_dirs, 341);
-                assert_eq!(values.num_files, 1360);
-            }
-            Err(e) => {
-                eprintln!("Error getting return values: {}", e);
-            }
-        }
+
+        let values = make_tree(args).unwrap();
+        assert_eq!(values.num_dirs, 341);
+        assert_eq!(values.num_files, 1360);
     }
 
     fn maketree_unbalanced_test(root_path: String) {
