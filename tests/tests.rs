@@ -65,41 +65,22 @@ mod tests {
     }
 
     fn verify_with_find(dirs: bool, dir_to_count: String) -> usize {
-        if dirs {
-            let find_output = Command::new("find")
-                .arg(dir_to_count)
-                .arg("-type")
-                .arg("d")
-                .stdout(Stdio::piped())
-                .spawn()
-                .expect("Error with find command");
-            let wc_output = Command::new("wc")
-                .arg("-l")
-                .stdin(find_output.stdout.unwrap())
-                .output()
-                .expect("Error with wc command");
-            String::from_utf8_lossy(&wc_output.stdout)
-                .trim()
-                .parse::<usize>()
-                .unwrap()
-        } else {
-            let find_output = Command::new("find")
-                .arg(dir_to_count)
-                .arg("-type")
-                .arg("f")
-                .stdout(Stdio::piped())
-                .spawn()
-                .expect("Error with find command");
-            let wc_output = Command::new("wc")
-                .arg("-l")
-                .stdin(find_output.stdout.unwrap())
-                .output()
-                .expect("Error with wc command");
-            String::from_utf8_lossy(&wc_output.stdout)
-                .trim()
-                .parse::<usize>()
-                .unwrap()
-        }
+        let find_output = Command::new("find")
+            .arg(dir_to_count)
+            .arg("-type")
+            .arg(if dirs { "d" } else { "f" })
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Error with find command");
+        let wc_output = Command::new("wc")
+            .arg("-l")
+            .stdin(find_output.stdout.unwrap())
+            .output()
+            .expect("Error with wc command");
+        String::from_utf8_lossy(&wc_output.stdout)
+            .trim()
+            .parse::<usize>()
+            .unwrap()
     }
 
     fn testdir_setup(root_path: &str) {
